@@ -1,11 +1,23 @@
 """AI LinkedIn Assistant - Streamlit Application Entry Point."""
 
+import os
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import streamlit as st
+
+# Load Streamlit Cloud secrets into env vars so settings.py picks them up
+if hasattr(st, "secrets") and st.secrets:
+    for key in [
+        "AI_PROVIDER", "GEMINI_API_KEY", "GEMINI_MODEL",
+        "OPENAI_API_KEY", "OPENAI_MODEL", "OPENROUTER_API_KEY",
+        "OPENROUTER_MODEL", "OLLAMA_BASE_URL", "OLLAMA_MODEL",
+        "EMBEDDING_MODEL", "DATABASE_URL",
+    ]:
+        if key in st.secrets and not os.getenv(key):
+            os.environ[key] = str(st.secrets[key])
 
 from ai_content_radar.database.manager import DatabaseManager
 
