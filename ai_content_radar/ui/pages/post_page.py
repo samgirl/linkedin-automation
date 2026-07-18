@@ -1,9 +1,6 @@
 """Post page - AI writes LinkedIn posts based on your expertise and context."""
 from __future__ import annotations
 
-import tempfile
-from pathlib import Path
-
 import streamlit as st
 
 from ai_content_radar.database.manager import DatabaseManager
@@ -12,25 +9,6 @@ from ai_content_radar.database.manager import DatabaseManager
 def post_page(db: DatabaseManager, user_id: int = 1) -> None:
     st.title("Create Post")
 
-    # --- Chrome status ---
-    from ai_content_radar.services.linkedin import get_status, launch_chrome, _is_cdp_running
-    chrome_ok = _is_cdp_running()
-    chrome_info = get_status()
-
-    if chrome_ok:
-        st.success(chrome_info["message"])
-    else:
-        st.warning(chrome_info["message"])
-        if st.button("Launch Chrome", type="primary"):
-            with st.spinner("Launching Chrome..."):
-                status = launch_chrome()
-            if status in ("launched", "already_running"):
-                st.success("Chrome launched! Log into LinkedIn there.")
-                st.rerun()
-            else:
-                st.error("Failed: " + str(status))
-
-    # --- Personal context ---
     knowledge = db.get_knowledge(user_id=user_id)
     if not knowledge:
         st.warning(
@@ -44,7 +22,6 @@ def post_page(db: DatabaseManager, user_id: int = 1) -> None:
 
     st.divider()
 
-    # --- Topic (optional) ---
     st.subheader("What should the post be about?")
     topic = st.text_input(
         "Topic or idea (optional - leave blank for AI to pick based on your expertise)",
@@ -59,15 +36,6 @@ def post_page(db: DatabaseManager, user_id: int = 1) -> None:
         "Thought leadership",
     ])
 
-    # --- Photos ---
-    photos = st.file_uploader(
-        "Photos (optional)",
-        type=["png", "jpg", "jpeg", "gif"],
-        accept_multiple_files=True,
-        key="post_photos",
-    )
-
-    # --- Generate ---
     st.divider()
     col1, col2 = st.columns([1, 4])
     with col1:
@@ -84,33 +52,20 @@ def post_page(db: DatabaseManager, user_id: int = 1) -> None:
                 except Exception as e:
                     st.error("Failed: " + str(e))
 
-    # --- Preview & Post ---
     if "generated_post" in st.session_state:
         st.subheader("Preview & Edit")
         edited = st.text_area(
-            "Edit before posting",
+            "Edit before copying",
             value=st.session_state["generated_post"],
             height=300,
             key="edit_post",
         )
         st.caption(str(len(edited)) + " characters")
 
-        # Save uploaded photos to temp files
-        photo_paths = []
-        if photos:
-            for photo in photos:
-                tmp = tempfile.NamedTemporaryFile(delete=False, suffix=Path(photo.name).suffix)
-                tmp.write(photo.read())
-                tmp.close()
-                photo_paths.append(tmp.name)
-
-        col_post, col_again = st.columns([1, 1])
-        with col_post:
-            if st.button("Post to LinkedIn", type="primary", use_container_width=True):
-                if not chrome_ok:
-                    st.error("Chrome is not connected. Launch Chrome first.")
-                else:
-                    _do_post(edited, photo_paths, db)
+        col_copy, col_again = st.columns([1, 1])
+        with col_copy:
+            st.code(edited, language=None)
+            st.info("Copy the text above and paste it into LinkedIn.")
         with col_again:
             if st.button("Generate Another", use_container_width=True):
                 with st.spinner("Writing..."):
@@ -214,31 +169,3 @@ def _call_openai(config, prompt: str) -> str:
         max_tokens=config.ai.max_tokens,
     )
     return response.choices[0].message.content.strip()
-
-
-def _do_post(post_text: str, photo_paths: list[str], db: DatabaseManager) -> None:
-    from ai_content_radar.services.linkedin import _is_cdp_running, get_driver, create_post
-
-    if not _is_cdp_running():
-        st.error("Chrome is not connected.")
-        return
-
-    try:
-        driver = get_driver()
-    except Exception as e:
-        st.error("Could not connect to Chrome: " + str(e))
-        return
-
-    with st.spinner("Posting to LinkedIn..."):
-        result = create_post(driver, post_text, photo_paths if photo_paths else None)
-
-    if result["success"]:
-        st.success(result["message"])
-        db.add_post({
-            "url": "linkedin.com/feed (my post)",
-            "title": "LinkedIn Post",
-            "text": post_text,
-            "source": "my_post",
-        })
-    else:
-        st.error(result["message"])

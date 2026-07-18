@@ -8,8 +8,8 @@ from ai_content_radar.database.manager import DatabaseManager
 
 def login_page(db: DatabaseManager) -> bool:
     """Show login screen. Returns True if logged in, False otherwise."""
-    st.title("Welcome to AI LinkedIn Assistant")
-    st.caption("Log in to personalize your experience")
+    st.title("Welcome to AI Content Radar")
+    st.caption("Create LinkedIn posts and comments with AI")
 
     users = db.get_all_users()
 

@@ -8,8 +8,18 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
-DATA_DIR = BASE_DIR / "data"
-PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
+
+# On Streamlit Cloud, /tmp is the only writable directory
+_tmp = Path("/tmp")
+if (_tmp / ".streamlit").exists() or os.getenv("STREAMLIT_SHARERUNNING"):
+    DATA_DIR = _tmp / "ai_content_radar_data"
+    PROMPTS_DIR = _tmp / "ai_content_radar_prompts"
+else:
+    DATA_DIR = BASE_DIR / "data"
+    PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
+
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+PROMPTS_DIR.mkdir(parents=True, exist_ok=True)
 
 load_dotenv(BASE_DIR / ".env")
 

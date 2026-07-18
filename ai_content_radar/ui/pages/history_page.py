@@ -1,4 +1,4 @@
-"""Search History page - view and rerun past searches."""
+"""History page - view past activity."""
 from __future__ import annotations
 
 import json
@@ -9,58 +9,45 @@ from ai_content_radar.database.manager import DatabaseManager
 
 
 def history_page(db: DatabaseManager, user_id: int = 1) -> None:
-    st.title("Search History")
-    st.caption("View and rerun past searches")
+    st.title("History")
+    st.caption("View your past activity")
 
-    history = db.get_search_history(limit=50)
+    tab_actions, tab_search = st.tabs(["Actions", "Search History"])
 
-    if not history:
-        st.info("No search history yet. Run your first search from the Find Opportunities page!")
-        return
+    with tab_actions:
+        st.subheader("Recent Actions")
+        actions = db.get_actions(limit=50, user_id=user_id)
+        if not actions:
+            st.info("No actions yet. Create posts or generate comments to see history here.")
+            return
 
-    for entry in history:
-        domains = json.loads(entry.domains) if entry.domains else []
-        keywords = json.loads(entry.keywords_used) if entry.keywords_used else []
+        for action in actions:
+            post = db.get_post_by_id(action.post_id)
+            post_title = (post.title or post.text[:60]) if post else "Unknown"
+            ts = action.timestamp.strftime("%Y-%m-%d %H:%M") if action.timestamp else ""
+            st.markdown(f"**{action.action}** - {post_title}")
+            st.caption(ts)
 
-        with st.expander(
-            f"Search: {entry.query[:60]} | {entry.results_count} results | Avg score: {entry.avg_score:.1f}"
-        ):
-            col1, col2 = st.columns(2)
+    with tab_search:
+        st.subheader("Search History")
+        history = db.get_search_history(limit=50)
+        if not history:
+            st.info("No search history yet.")
+            return
 
-            with col1:
-                st.markdown(f"**Query:** {entry.query}")
-                st.markdown(f"**Domains:** {', '.join(domains) if domains else 'N/A'}")
-                st.markdown(f"**Keywords:** {', '.join(keywords[:10]) if keywords else 'N/A'}")
-
-            with col2:
-                st.metric("Results", entry.results_count)
-                st.metric("Avg Score", f"{entry.avg_score:.1f}")
-                st.metric("Duration", f"{entry.duration_seconds:.1f}s")
-
-            st.caption(f"Searched at: {entry.searched_at.strftime('%Y-%m-%d %H:%M') if entry.searched_at else 'Unknown'}")
-
-            if st.button("Rerun Search", key=f"rerun_{entry.id}"):
-                st.session_state.current_page = "search"
-                st.rerun()
-
-    st.divider()
-    st.subheader("Export History")
-
-    if st.button("Export as JSON"):
-        export_data = []
         for entry in history:
-            export_data.append({
-                "query": entry.query,
-                "domains": json.loads(entry.domains) if entry.domains else [],
-                "keywords": json.loads(entry.keywords_used) if entry.keywords_used else [],
-                "results_count": entry.results_count,
-                "avg_score": entry.avg_score,
-                "duration_seconds": entry.duration_seconds,
-                "searched_at": entry.searched_at.isoformat() if entry.searched_at else None,
-            })
-        st.download_button(
-            "Download JSON",
-            data=json.dumps(export_data, indent=2),
-            file_name="search_history.json",
-            mime="application/json",
-        )
+            domains = json.loads(entry.domains) if entry.domains else []
+            keywords = json.loads(entry.keywords_used) if entry.keywords_used else []
+            ts = entry.searched_at.strftime("%Y-%m-%d %H:%M") if entry.searched_at else ""
+
+            with st.expander(
+                "Search: " + entry.query[:60] + " | " + str(entry.results_count) + " results"
+            ):
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.markdown("**Query:** " + entry.query)
+                    st.markdown("**Domains:** " + (", ".join(domains) if domains else "N/A"))
+                with col2:
+                    st.metric("Results", entry.results_count)
+                    st.metric("Avg Score", "%.1f" % entry.avg_score)
+                st.caption("Searched at: " + ts)

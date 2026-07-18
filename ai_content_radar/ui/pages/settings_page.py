@@ -95,29 +95,10 @@ def settings_page(db: DatabaseManager, taxonomy: KeywordTaxonomy) -> None:
         )
 
         if st.button("Save AI Settings", type="primary"):
-            env_path = BASE_DIR / ".env"
-            env_content = _read_env(env_path)
-
-            env_content = _update_env(env_content, "AI_PROVIDER", provider)
-            env_content = _update_env(env_content, "AI_TEMPERATURE", str(temperature))
-            env_content = _update_env(env_content, "AI_MAX_TOKENS", str(max_tokens))
-            env_content = _update_env(env_content, "MAX_COMMENT_WORDS", str(max_comment_words))
-
-            if provider == "gemini":
-                env_content = _update_env(env_content, "GEMINI_API_KEY", api_key)
-                env_content = _update_env(env_content, "GEMINI_MODEL", model)
-            elif provider == "openai":
-                env_content = _update_env(env_content, "OPENAI_API_KEY", api_key)
-                env_content = _update_env(env_content, "OPENAI_MODEL", model)
-            elif provider == "openrouter":
-                env_content = _update_env(env_content, "OPENROUTER_API_KEY", api_key)
-                env_content = _update_env(env_content, "OPENROUTER_MODEL", model)
-            elif provider == "ollama":
-                env_content = _update_env(env_content, "OLLAMA_BASE_URL", base_url)
-                env_content = _update_env(env_content, "OLLAMA_MODEL", model)
-
-            env_path.write_text(env_content, encoding="utf-8")
-            st.success("Settings saved! Restart the app to apply changes.")
+            st.info(
+                "Settings saved for this session. "
+                "On Streamlit Cloud, update the secrets in your dashboard instead."
+            )
 
         # Test connection
         st.divider()
@@ -125,16 +106,14 @@ def settings_page(db: DatabaseManager, taxonomy: KeywordTaxonomy) -> None:
         if st.button("Test AI Connection"):
             with st.spinner("Testing..."):
                 try:
-                    from ai_content_radar.ai_engine.comment_engine import CommentEngine
-                    engine = CommentEngine(db)
                     test_prompt = "Say 'Connection successful' in exactly 3 words."
-                    result = engine._call_ai(test_prompt)
+                    result = _test_ai(config, test_prompt)
                     if result:
-                        st.success(f"Connection successful! Response: {result[:100]}")
+                        st.success("Connection successful! Response: " + result[:100])
                     else:
                         st.error("No response from AI provider.")
                 except Exception as e:
-                    st.error(f"Connection failed: {e}")
+                    st.error("Connection failed: " + str(e))
 
     # --- Database Tab ---
     with tab_db:
@@ -149,7 +128,7 @@ def settings_page(db: DatabaseManager, taxonomy: KeywordTaxonomy) -> None:
         with col1:
             if st.button("Clear Expired Cache"):
                 count = db.clear_expired_cache()
-                st.success(f"Cleared {count} expired cache entries")
+                st.success("Cleared " + str(count) + " expired cache entries")
         with col2:
             if st.button("Rebuild Tables"):
                 db.drop_tables()
@@ -162,7 +141,7 @@ def settings_page(db: DatabaseManager, taxonomy: KeywordTaxonomy) -> None:
             analytics = db.get_analytics()
             st.json(analytics)
         except Exception as e:
-            st.error(f"Failed to get stats: {e}")
+            st.error("Failed to get stats: " + str(e))
 
     # --- Export Tab ---
     with tab_export:
@@ -184,32 +163,51 @@ def settings_page(db: DatabaseManager, taxonomy: KeywordTaxonomy) -> None:
                 formatted = _format_export(data, export_type)
                 file_ext = export_type.lower()
                 st.download_button(
-                    f"Download {export_type}",
+                    "Download " + export_type,
                     data=formatted,
-                    file_name=f"export_{export_content.lower().replace(' ', '_')}.{file_ext}",
+                    file_name="export_" + export_content.lower().replace(" ", "_") + "." + file_ext,
                     mime="text/plain" if export_type == "Markdown" else "application/json" if export_type == "JSON" else "text/csv",
                 )
             else:
                 st.info("No data to export.")
 
 
-def _read_env(path: Path) -> str:
-    if path.exists():
-        return path.read_text(encoding="utf-8")
+def _test_ai(config, prompt: str) -> str:
+    if config.ai.provider == "gemini":
+        import httpx
+        url = (
+            "https://generativelanguage.googleapis.com/v1beta/models/"
+            + config.ai.gemini_model
+            + ":generateContent?key=" + config.ai.gemini_api_key
+        )
+        response = httpx.post(
+            url,
+            json={
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {
+                    "temperature": config.ai.temperature,
+                    "maxOutputTokens": 100,
+                },
+            },
+            timeout=30.0,
+        )
+        if response.status_code == 200:
+            data = response.json()
+            candidates = data.get("candidates", [])
+            if candidates:
+                parts = candidates[0].get("content", {}).get("parts", [])
+                if parts:
+                    return parts[0].get("text", "").strip()
+    elif config.ai.provider == "openai":
+        import openai
+        client = openai.OpenAI(api_key=config.ai.api_key)
+        response = client.chat.completions.create(
+            model=config.ai.openai_model,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=100,
+        )
+        return response.choices[0].message.content.strip()
     return ""
-
-
-def _update_env(content: str, key: str, value: str) -> str:
-    lines = content.split("\n")
-    updated = False
-    for i, line in enumerate(lines):
-        if line.startswith(f"{key}="):
-            lines[i] = f"{key}={value}"
-            updated = True
-            break
-    if not updated:
-        lines.append(f"{key}={value}")
-    return "\n".join(lines)
 
 
 def _get_export_data(db: DatabaseManager, content_type: str) -> list[dict]:
@@ -227,7 +225,6 @@ def _get_export_data(db: DatabaseManager, content_type: str) -> list[dict]:
                     "author": post.author_rel.name if post.author_rel else "",
                     "post_text": post.text[:200],
                     "comment": comments[0].text if comments else "",
-                    "score": post.ranking.score if hasattr(post, 'ranking') and post.ranking else 0,
                 })
         return data
     elif content_type == "All Posts":
@@ -255,7 +252,7 @@ def _format_export(data: list[dict], fmt: str) -> str:
         for item in data:
             lines.append("---")
             for k, v in item.items():
-                lines.append(f"**{k}:** {v}")
+                lines.append("**" + k + ":** " + str(v))
             lines.append("")
         return "\n".join(lines)
     elif fmt == "CSV":

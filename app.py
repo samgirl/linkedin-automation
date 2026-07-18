@@ -50,8 +50,6 @@ user_name = st.session_state["user_name"]
 # --- Session State ---
 if "current_page" not in st.session_state:
     st.session_state.current_page = "post"
-if "search_results" not in st.session_state:
-    st.session_state.search_results = []
 
 # --- Sidebar ---
 with st.sidebar:
@@ -60,13 +58,13 @@ with st.sidebar:
     st.divider()
 
     pages = {
-        "post": "📝 Create Post",
-        "search": "🔍 Find Opportunities",
-        "keywords": "🏷️ Keywords",
-        "knowledge": "🧠 My Context",
-        "analytics": "📊 Analytics",
-        "history": "📋 History",
-        "settings": "⚙️ Settings",
+        "post": "Create Post",
+        "comment": "Comment Helper",
+        "keywords": "Keywords",
+        "knowledge": "My Context",
+        "analytics": "Analytics",
+        "history": "History",
+        "settings": "Settings",
     }
 
     for key, label in pages.items():
@@ -88,11 +86,9 @@ with st.sidebar:
 if st.session_state.current_page == "post":
     from ai_content_radar.ui.pages.post_page import post_page
     post_page(db, user_id=user_id)
-elif st.session_state.current_page == "search":
-    from ai_content_radar.services.taxonomy import KeywordTaxonomy
-    taxonomy = KeywordTaxonomy()
-    from ai_content_radar.ui.pages.search_page import search_page
-    search_page(db, taxonomy, user_id=user_id)
+elif st.session_state.current_page == "comment":
+    from ai_content_radar.ui.pages.comment_helper_page import comment_helper_page
+    comment_helper_page(db, user_id=user_id)
 elif st.session_state.current_page == "keywords":
     from ai_content_radar.services.taxonomy import KeywordTaxonomy
     taxonomy = KeywordTaxonomy()
