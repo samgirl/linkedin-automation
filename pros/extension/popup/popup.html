@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PROS Capture</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>PROS</h1>
+      <span class="subtitle">Capture your professional life</span>
+    </header>
+    
+    <main>
+      <div class="page-info" id="pageInfo">
+        <div class="page-title" id="pageTitle">Loading...</div>
+        <div class="page-url" id="pageUrl"></div>
+      </div>
+      
+      <div class="quick-actions">
+        <button id="saveBtn" class="btn btn-primary">
+          <span class="icon">💾</span> Save Page
+        </button>
+        <button id="noteBtn" class="btn btn-secondary">
+          <span class="icon">📝</span> Quick Note
+        </button>
+      </div>
+      
+      <div class="note-form" id="noteForm" style="display: none;">
+        <textarea id="noteText" placeholder="What's on your mind?" rows="4"></textarea>
+        <div class="form-actions">
+          <button id="saveNoteBtn" class="btn btn-primary">Save Note</button>
+          <button id="cancelNoteBtn" class="btn btn-secondary">Cancel</button>
+        </div>
+      </div>
+      
+      <div class="status" id="status"></div>
+    </main>
+    
+    <footer>
+      <a href="#" id="settingsLink">Settings</a>
+    </footer>
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>

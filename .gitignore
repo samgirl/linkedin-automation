@@ -1,0 +1,54 @@
+# Environment
+.env
+.env.local
+.env.production
+
+# Database
+*.db
+data/*.db
+data/content_radar.db
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Logs
+*.log
+data/*.log
+
+# Temp
+*.tmp
+*.bak
+
+# Chrome profile (local only)
+chrome_profile/
+
+# Node (for pros frontend)
+node_modules/
+.next/
