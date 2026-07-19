@@ -1,4 +1,4 @@
-"""Login page - simple name-based login for personalization."""
+"""Login page - simple name-based login."""
 from __future__ import annotations
 
 import streamlit as st
@@ -7,9 +7,8 @@ from ai_content_radar.database.manager import DatabaseManager
 
 
 def login_page(db: DatabaseManager) -> bool:
-    """Show login screen. Returns True if logged in, False otherwise."""
-    st.title("Welcome to AI Content Radar")
-    st.caption("Create LinkedIn posts and comments with AI")
+    st.title("AI LinkedIn Assistant")
+    st.caption("Create posts and comments with AI that sounds like you")
 
     users = db.get_all_users()
 
@@ -29,11 +28,9 @@ def login_page(db: DatabaseManager) -> bool:
 
     with tab_new:
         name = st.text_input("Your name", placeholder="e.g. Arjun", key="new_name")
-        email = st.text_input("Email (optional)", placeholder="you@example.com", key="new_email")
-
         if st.button("Create Profile", type="primary", use_container_width=True):
             if name.strip():
-                user = db.get_or_create_user(name.strip(), email.strip())
+                user = db.get_or_create_user(name.strip())
                 st.session_state["user_id"] = user.id
                 st.session_state["user_name"] = user.name
                 st.rerun()
