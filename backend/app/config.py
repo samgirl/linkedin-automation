@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from pydantic import field_validator
 from functools import lru_cache
 
 
@@ -9,6 +10,13 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:5173"
 
     database_url: str = "postgresql+asyncpg://pros:pros@localhost:5432/pros"
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def ensure_async_driver(cls, v: str) -> str:
+        if v and v.startswith("postgresql://") and "+asyncpg" not in v:
+            return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return v
     redis_url: str = "redis://localhost:6379/0"
 
     jwt_secret_key: str = "change-me"
