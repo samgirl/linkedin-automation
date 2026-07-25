@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { width: 380px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #111827; color: #e5e7eb; padding: 16px; }
+    .logo { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+    .logo-icon { width: 28px; height: 28px; background: #4c6ef5; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; color: white; }
+    .logo-text { font-size: 14px; font-weight: 600; }
+    .logo-sub { font-size: 11px; color: #6b7280; }
+
+    .focus-guard { background: #1f2937; border: 1px solid #374151; border-radius: 10px; padding: 12px; margin-bottom: 14px; }
+    .focus-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .focus-title { font-size: 12px; font-weight: 600; color: #10b981; }
+    .focus-title.warning { color: #f59e0b; }
+    .focus-title.critical { color: #ef4444; }
+    .focus-time { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .focus-limit { font-size: 11px; color: #6b7280; }
+    .progress-bar { width: 100%; height: 6px; background: #374151; border-radius: 3px; overflow: hidden; margin-top: 8px; }
+    .progress-fill { height: 100%; border-radius: 3px; transition: width 0.5s, background 0.5s; }
+    .focus-actions { display: flex; gap: 6px; margin-top: 10px; }
+    .focus-btn { flex: 1; padding: 6px; border: 1px solid #374151; border-radius: 6px; background: #111827; color: #9ca3af; font-size: 11px; cursor: pointer; text-align: center; }
+    .focus-btn:hover { border-color: #4c6ef5; color: #e5e7eb; }
+
+    .section { margin-bottom: 12px; }
+    .section-title { font-size: 11px; text-transform: uppercase; color: #6b7280; margin-bottom: 6px; font-weight: 500; }
+    .url-box { background: #1f2937; border: 1px solid #374151; border-radius: 8px; padding: 10px; font-size: 12px; color: #9ca3af; word-break: break-all; margin-bottom: 12px; }
+    textarea { width: 100%; min-height: 70px; background: #1f2937; border: 1px solid #374151; border-radius: 8px; padding: 10px; font-size: 13px; color: #e5e7eb; resize: vertical; font-family: inherit; }
+    textarea:focus { outline: none; border-color: #4c6ef5; }
+    .tags { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+    .tag { background: #374151; border: none; border-radius: 12px; padding: 4px 10px; font-size: 11px; color: #9ca3af; cursor: pointer; }
+    .tag.active { background: #4c6ef520; color: #748ffc; }
+    .btn { width: 100%; padding: 10px; border: none; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; margin-top: 10px; }
+    .btn-primary { background: #4c6ef5; color: white; }
+    .btn-primary:hover { background: #4263eb; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-secondary { background: #374151; color: #e5e7eb; }
+    .btn-secondary:hover { background: #4b5563; }
+    .status { text-align: center; font-size: 12px; margin-top: 8px; color: #10b981; display: none; }
+    .status.show { display: block; }
+    .config { margin-top: 12px; }
+    .config input { width: 100%; background: #1f2937; border: 1px solid #374151; border-radius: 8px; padding: 8px 10px; font-size: 12px; color: #e5e7eb; }
+    .config input:focus { outline: none; border-color: #4c6ef5; }
+    .config label { font-size: 11px; color: #6b7280; display: block; margin-bottom: 4px; }
+    .divider { border-top: 1px solid #374151; margin: 12px 0; }
+  </style>
+</head>
+<body>
+  <div class="logo">
+    <div class="logo-icon">P</div>
+    <div>
+      <div class="logo-text">PROS</div>
+      <div class="logo-sub">Focus Guard & Context Saver</div>
+    </div>
+  </div>
+
+  <div class="focus-guard" id="focusGuard">
+    <div class="focus-header">
+      <div class="focus-title" id="focusStatus">LinkedIn Focus Guard</div>
+      <div class="focus-time" id="focusTime">0m</div>
+    </div>
+    <div class="focus-limit" id="focusLimit">0 / 30 min today</div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%;background:#10b981"></div></div>
+    <div class="focus-actions">
+      <button class="focus-btn" id="btnCloseLi">Close LinkedIn</button>
+      <button class="focus-btn" id="btnJournal">Quick Journal</button>
+      <button class="focus-btn" id="btnOpportunities">View Opportunities</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="url-box" id="pageUrl">Loading...</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Notes (optional)</div>
+    <textarea id="notes" placeholder="Why is this interesting? What did you find valuable?"></textarea>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Tags</div>
+    <div class="tags" id="tags">
+      <button class="tag" data-tag="article">Article</button>
+      <button class="tag" data-tag="idea">Idea</button>
+      <button class="tag" data-tag="inspiration">Inspiration</button>
+      <button class="tag" data-tag="competitor">Competitor</button>
+      <button class="tag" data-tag="trend">Trend</button>
+    </div>
+  </div>
+
+  <button class="btn btn-primary" id="saveBtn">Save to PROS</button>
+  <div class="status" id="status">Saved!</div>
+
+  <div class="divider"></div>
+
+  <div class="config" id="config">
+    <label>API URL</label>
+    <input type="text" id="apiUrl" placeholder="http://localhost:8000">
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
