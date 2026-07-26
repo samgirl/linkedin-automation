@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -13,6 +14,15 @@ from app.middleware.rate_limiter import RateLimiterMiddleware
 from app.api import auth, connectors, context, opportunities, drafts, journal, dashboard, scanner
 
 settings = get_settings()
+
+cors_origins = [
+    settings.frontend_url,
+    "http://localhost:5173",
+    "http://localhost:3000",
+]
+extra = os.environ.get("CORS_ORIGINS", "")
+if extra:
+    cors_origins.extend([o.strip() for o in extra.split(",") if o.strip()])
 
 
 @asynccontextmanager
@@ -30,12 +40,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        settings.frontend_url,
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "https://*.vercel.app",
-    ],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
