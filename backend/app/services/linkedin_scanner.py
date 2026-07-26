@@ -30,6 +30,9 @@ class LinkedInScanner:
 
     async def analyze_post_url(self, user_id: str, post_url: str) -> dict:
         """Analyze a specific LinkedIn post URL — extract context and suggest comment."""
+        if not self.llm.has_key:
+            return {"error": "AI features require an API key. Set ANTHROPIC_API_KEY or OPENAI_API_KEY."}
+
         user = await self.db.get(User, user_id)
         if not user:
             return {"error": "User not found"}
@@ -82,10 +85,10 @@ Suggest 1 post idea (2-3 sentences) the user could write that responds to or exp
         }
 
     async def scan_for_opportunities(self, user_id: str, topic: str = None) -> list:
-        """Scan for posts where the user can add value.
+        """Scan for posts where the user can add value."""
+        if not self.llm.has_key:
+            return []
 
-        Uses the user's identity + memories to find trending posts in their space.
-        """
         user = await self.db.get(User, user_id)
         if not user:
             return []
@@ -118,12 +121,10 @@ Return as JSON array."""
         return opportunities if isinstance(opportunities, list) else []
 
     async def generate_opportunities(self, user_id: str) -> list:
-        """Generate AI-based opportunity suggestions based on user context.
+        """Generate AI-based opportunity suggestions based on user context."""
+        if not self.llm.has_key:
+            return []
 
-        This doesn't scan live LinkedIn (that requires API access).
-        Instead, it uses the user's context to suggest what types of posts
-        they should look for, and generates engagement templates.
-        """
         identity = await self.context_engine.get_identity_summary(user_id)
         memories = await self.context_engine.get_recent_memories(user_id, limit=10)
 

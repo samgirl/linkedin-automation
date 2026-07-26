@@ -37,14 +37,17 @@ class TrendScanner:
 
         identity = await self.context_engine.get_identity_summary(user_id)
         interests = await self.context_engine.get_interests(user_id)
-
-        # Get today's trends
         trends = await self.scan_trends(user_id)
-
-        # Get recent memories for context
         memories = await self.context_engine.get_recent_memories(user_id, limit=5)
 
-        # Generate the briefing
+        if not self.llm.has_key:
+            return {
+                "date": datetime.now(timezone.utc).date().isoformat(),
+                "briefing": "AI briefing requires an API key. Set ANTHROPIC_API_KEY or OPENAI_API_KEY to enable AI features.",
+                "trends": trends,
+                "generated_at": datetime.now(timezone.utc).isoformat(),
+            }
+
         briefing_prompt = f"""You are generating a daily LinkedIn briefing for this person:
 
 {identity}
@@ -68,7 +71,10 @@ Create a concise daily briefing with:
 
 Keep it punchy and actionable. No fluff."""
 
-        briefing = await self.llm.generate(briefing_prompt, max_tokens=1500)
+        try:
+            briefing = await self.llm.generate(briefing_prompt, max_tokens=1500)
+        except Exception:
+            briefing = "AI briefing unavailable. Set an API key to enable AI-powered briefings."
 
         return {
             "date": datetime.now(timezone.utc).date().isoformat(),
@@ -79,6 +85,9 @@ Keep it punchy and actionable. No fluff."""
 
     async def scan_trends(self, user_id: str) -> list:
         """Scan for trending topics in the user's industry."""
+        if not self.llm.has_key:
+            return []
+
         interests = await self.context_engine.get_interests(user_id)
         topics = interests.get("primary_topics", "AI, startups, technology, business")
 
@@ -95,11 +104,14 @@ For each trend:
 
 Focus on real, specific topics (not generic). Return as JSON array."""
 
-        trends = await self.llm.generate(
-            trend_prompt,
-            max_tokens=2000,
-            response_format="json"
-        )
+        try:
+            trends = await self.llm.generate(
+                trend_prompt,
+                max_tokens=2000,
+                response_format="json"
+            )
+        except Exception:
+            return []
 
         return trends if isinstance(trends, list) else []
 
@@ -108,11 +120,12 @@ Focus on real, specific topics (not generic). Return as JSON array."""
 
         Uses web search as a fallback when no news API is configured.
         """
+        if not self.llm.has_key:
+            return []
+
         interests = await self.context_engine.get_interests(user_id)
         search_query = query or f"latest news {interests.get('primary_topics', 'technology')}"
 
-        # This would use a real news API in production
-        # For V1, we use the LLM's knowledge + web search suggestions
         news_prompt = f"""Find 5 recent news articles relevant to: {search_query}
 
 For each:
@@ -124,16 +137,22 @@ For each:
 
 Return as JSON array."""
 
-        articles = await self.llm.generate(
-            news_prompt,
-            max_tokens=2000,
-            response_format="json"
-        )
+        try:
+            articles = await self.llm.generate(
+                news_prompt,
+                max_tokens=2000,
+                response_format="json"
+            )
+        except Exception:
+            return []
 
         return articles if isinstance(articles, list) else []
 
     async def get_linkedin_trends(self, user_id: str) -> list:
         """Find trending LinkedIn posts/topics in the user's space."""
+        if not self.llm.has_key:
+            return []
+
         identity = await self.context_engine.get_identity_summary(user_id)
 
         trend_prompt = f"""The user's expertise: {identity}
@@ -149,11 +168,14 @@ For each:
 
 Return as JSON array."""
 
-        trends = await self.llm.generate(
-            trend_prompt,
-            max_tokens=2000,
-            response_format="json"
-        )
+        try:
+            trends = await self.llm.generate(
+                trend_prompt,
+                max_tokens=2000,
+                response_format="json"
+            )
+        except Exception:
+            return []
 
         return trends if isinstance(trends, list) else []
 

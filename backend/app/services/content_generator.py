@@ -56,6 +56,9 @@ class ContentGenerator:
         self.llm = LLMOrchestrator()
 
     async def generate_for_opportunity(self, user_id: str, opportunity: Opportunity) -> Draft:
+        if not self.llm.has_key:
+            raise ValueError("AI features require an API key. Set ANTHROPIC_API_KEY or OPENAI_API_KEY.")
+
         context = await self.context_engine.get_user_context_for_generation(user_id)
 
         if opportunity.type == "comment":
@@ -83,6 +86,9 @@ class ContentGenerator:
         return draft
 
     async def generate_standalone(self, user_id: str, draft_type: str, topic: str, extra_context: str = "") -> Draft:
+        if not self.llm.has_key:
+            raise ValueError("AI features require an API key. Set ANTHROPIC_API_KEY or OPENAI_API_KEY.")
+
         context = await self.context_engine.get_user_context_for_generation(user_id)
 
         if draft_type == "comment":

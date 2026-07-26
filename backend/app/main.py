@@ -21,6 +21,7 @@ cors_origins = [
     settings.frontend_url,
     "http://localhost:5173",
     "http://localhost:3000",
+    "https://pros-frontend-eight.vercel.app",
 ]
 extra = os.environ.get("CORS_ORIGINS", "")
 if extra:

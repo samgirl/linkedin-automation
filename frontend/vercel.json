@@ -7,7 +7,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://pros-backend.up.railway.app/api/:path*"
+      "destination": "https://pros-backend-k3wf.onrender.com/api/:path*"
     }
   ]
 }

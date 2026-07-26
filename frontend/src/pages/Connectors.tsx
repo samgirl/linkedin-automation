@@ -18,7 +18,7 @@ export default function Connectors() {
   const [syncing, setSyncing] = useState<string | null>(null)
 
   useEffect(() => {
-    api.get('/connectors/').then(setConnections).finally(() => setLoading(false))
+    api.get('/connectors/').then(setConnections).catch(() => {}).finally(() => setLoading(false))
   }, [])
 
   const connectLinkedIn = async () => {

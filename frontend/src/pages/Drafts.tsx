@@ -13,7 +13,7 @@ export default function Drafts() {
   const [editContent, setEditContent] = useState('')
 
   useEffect(() => {
-    api.get('/drafts/').then(setDrafts).finally(() => setLoading(false))
+    api.get('/drafts/').then(setDrafts).catch(() => {}).finally(() => setLoading(false))
   }, [])
 
   const generate = async () => {
