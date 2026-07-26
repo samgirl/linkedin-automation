@@ -21,9 +21,9 @@ def _get_fernet() -> Fernet:
         key = Fernet.generate_key().decode()
     if isinstance(key, str):
         key = key.encode()
-    if len(key) < 32:
-        import hashlib
-        key = base64.urlsafe_b64encode(hashlib.sha256(key).digest())
+    # Always derive a proper Fernet key (32 url-safe base64 bytes) from whatever we have
+    import hashlib
+    key = base64.urlsafe_b64encode(hashlib.sha256(key).digest())
     return Fernet(key)
 
 

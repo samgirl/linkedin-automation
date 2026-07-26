@@ -1,6 +1,18 @@
+import os
 from pydantic_settings import BaseSettings
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from functools import lru_cache
+
+
+def _detect_backend_url() -> str:
+    """Detect the backend's own public URL from common hosting env vars."""
+    for var in ("RENDER_EXTERNAL_URL", "RAILWAY_PUBLIC_DOMAIN", "HEROKU_APP_NAME"):
+        val = os.environ.get(var, "")
+        if val:
+            if not val.startswith("http"):
+                val = f"https://{val}"
+            return val.rstrip("/")
+    return "http://localhost:8000"
 
 
 class Settings(BaseSettings):
@@ -16,12 +28,10 @@ class Settings(BaseSettings):
     def ensure_async_driver(cls, v: str) -> str:
         if not v:
             return v
-        # Normalize postgres:// to postgresql:// (common with Neon, Heroku)
         if v.startswith("postgres://"):
             v = "postgresql://" + v[len("postgres://"):]
         if v.startswith("postgresql://") and "+asyncpg" not in v:
             v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
-        # Strip all SSL params from URL — asyncpg handles SSL via connect_args in database.py
         from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
         parsed = urlparse(v)
         qs = parse_qs(parsed.query, keep_blank_values=True)
@@ -30,6 +40,7 @@ class Settings(BaseSettings):
         new_query = urlencode(qs, doseq=True) if qs else ""
         v = urlunparse(parsed._replace(query=new_query))
         return v
+
     redis_url: str = "redis://localhost:6379/0"
 
     jwt_secret_key: str = "change-me"
@@ -39,21 +50,34 @@ class Settings(BaseSettings):
 
     linkedin_client_id: str = ""
     linkedin_client_secret: str = ""
-    linkedin_redirect_uri: str = "http://localhost:8000/api/auth/callback/linkedin"
+    linkedin_redirect_uri: str = ""
 
     google_client_id: str = ""
     google_client_secret: str = ""
-    google_redirect_uri: str = "http://localhost:8000/api/auth/callback/google"
+    google_redirect_uri: str = ""
 
     default_ai_provider: str = "anthropic"
     anthropic_api_key: str = ""
     openai_api_key: str = ""
 
-    # ChromaDB — optional. If not set, falls back to PostgreSQL text search.
     chroma_host: str = ""
     chroma_port: int = 8000
 
     encryption_key: str = ""
+
+    @model_validator(mode="after")
+    def _auto_derive_urls(self):
+        backend = _detect_backend_url()
+
+        if not self.linkedin_redirect_uri:
+            self.linkedin_redirect_uri = f"{backend}/api/auth/callback/linkedin"
+        if not self.google_redirect_uri:
+            self.google_redirect_uri = f"{backend}/api/auth/callback/google"
+
+        if self.frontend_url == "http://localhost:5173" and self.app_env == "production":
+            self.frontend_url = "https://pros-frontend-eight.vercel.app"
+
+        return self
 
     class Config:
         env_file = ".env"
