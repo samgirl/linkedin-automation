@@ -47,9 +47,17 @@ async def register(req: EmailRegisterRequest, db: AsyncSession = Depends(get_db)
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    user = User(email=req.email, name=req.name, password_hash=hash_password(req.password))
+    try:
+        hashed = hash_password(req.password)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Password hashing failed: {type(e).__name__}: {e}")
+
+    user = User(email=req.email, name=req.name, password_hash=hashed)
     db.add(user)
-    await db.flush()
+    try:
+        await db.flush()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Database error: {type(e).__name__}: {e}")
 
     access = create_access_token(user.id)
     refresh = create_refresh_token(user.id)
@@ -169,6 +177,65 @@ async def google_callback(code: str = "", state: str = "", db: AsyncSession = De
     conn.provider_user_id = user_info.get("id")
     conn.provider_email = email
     conn.profile_data = user_info
+
+    access = create_access_token(user.id)
+    refresh = create_refresh_token(user.id)
+
+    redirect = RedirectResponse(f"{settings.frontend_url}/auth/callback?access={access}&refresh={refresh}")
+    return redirect
+
+
+@router.get("/callback/linkedin")
+async def linkedin_callback(code: str = "", state: str = "", db: AsyncSession = Depends(get_db)):
+    if not code:
+        raise HTTPException(status_code=400, detail="Missing authorization code")
+
+    async with httpx.AsyncClient() as client:
+        token_resp = await client.post(
+            "https://www.linkedin.com/oauth/v2/accessToken",
+            data={
+                "code": code,
+                "client_id": settings.linkedin_client_id,
+                "client_secret": settings.linkedin_client_secret,
+                "redirect_uri": settings.linkedin_redirect_uri,
+                "grant_type": "authorization_code",
+            },
+        )
+        if token_resp.status_code != 200:
+            raise HTTPException(status_code=400, detail="Failed to exchange LinkedIn code")
+        tokens = token_resp.json()
+
+        profile_resp = await client.get(
+            "https://api.linkedin.com/v2/userinfo",
+            headers={"Authorization": f"Bearer {tokens['access_token']}"},
+        )
+        profile = profile_resp.json()
+
+    email = profile.get("email", "")
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if not user:
+        user = User(
+            email=email,
+            name=profile.get("name", ""),
+            avatar_url=profile.get("picture"),
+        )
+        db.add(user)
+        await db.flush()
+
+    conn_result = await db.execute(
+        select(Connection).where(Connection.user_id == user.id, Connection.provider == "linkedin")
+    )
+    conn = conn_result.scalar_one_or_none()
+    if not conn:
+        conn = Connection(user_id=user.id, provider="linkedin")
+        db.add(conn)
+
+    conn.access_token_encrypted = encrypt_token(tokens.get("access_token", ""))
+    conn.refresh_token_encrypted = encrypt_token(tokens.get("refresh_token", ""))
+    conn.provider_user_id = profile.get("sub")
+    conn.provider_email = email
+    conn.profile_data = profile
 
     access = create_access_token(user.id)
     refresh = create_refresh_token(user.id)

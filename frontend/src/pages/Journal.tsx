@@ -224,7 +224,7 @@ export default function Journal() {
             <textarea
               className="input min-h-[120px] resize-y"
               placeholder={
-                entryType === 'meeting_notes' ? 'Paste meeting notes or transcript...'
+                entryType === 'meeting_note' ? 'Paste meeting notes or transcript...'
                 : entryType === 'idea' ? 'What idea do you want to capture?'
                 : entryType === 'link' ? 'Add notes about this link...'
                 : 'What did you work on today? What did you learn?'

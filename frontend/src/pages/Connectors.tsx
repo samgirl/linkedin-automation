@@ -71,8 +71,10 @@ export default function Connectors() {
 
   const disconnect = async (connectionId: string) => {
     if (!confirm('Disconnect this account?')) return
-    await api.del(`/connectors/${connectionId}`)
-    setConnections(connections.filter(c => c.id !== connectionId))
+    try {
+      await api.del(`/connectors/${connectionId}`)
+      setConnections(connections.filter(c => c.id !== connectionId))
+    } catch (e) { console.error(e) }
   }
 
   if (loading) return <div className="flex h-64 items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" /></div>

@@ -22,9 +22,13 @@ class Settings(BaseSettings):
         if v.startswith("postgresql://") and "+asyncpg" not in v:
             v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
         # Strip all SSL params from URL — asyncpg handles SSL via connect_args in database.py
-        import re
-        v = re.sub(r'[?&](sslmode|ssl)=[^&]*', '', v)
-        v = v.rstrip('?&')
+        from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
+        parsed = urlparse(v)
+        qs = parse_qs(parsed.query, keep_blank_values=True)
+        for key in ("sslmode", "ssl"):
+            qs.pop(key, None)
+        new_query = urlencode(qs, doseq=True) if qs else ""
+        v = urlunparse(parsed._replace(query=new_query))
         return v
     redis_url: str = "redis://localhost:6379/0"
 

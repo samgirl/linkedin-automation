@@ -1,12 +1,14 @@
 import os
 import sys
+import traceback
 from pathlib import Path
 from contextlib import asynccontextmanager
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.config import get_settings
 from app.database import init_db
@@ -56,6 +58,21 @@ app.include_router(drafts.router)
 app.include_router(journal.router)
 app.include_router(dashboard.router)
 app.include_router(scanner.router)
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    is_dev = settings.app_env != "production"
+    detail = str(exc)
+    tb = traceback.format_exc() if is_dev else None
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": detail,
+            "type": type(exc).__name__,
+            "traceback": tb,
+        },
+    )
 
 
 @app.get("/health")

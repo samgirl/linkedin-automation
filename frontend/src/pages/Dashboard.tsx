@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
 import { useAuth } from '../hooks/useAuth'
-import { Target, Brain, BookOpen, TrendingUp, Sparkles, ArrowRight, Clock, Flame, Search } from 'lucide-react'
+import { Target, Brain, BookOpen, TrendingUp, Sparkles, ArrowRight, Flame, Search } from 'lucide-react'
 
 export default function Dashboard() {
   const { user } = useAuth()
@@ -43,20 +43,19 @@ export default function Dashboard() {
         <p className="text-gray-500">Here's your daily briefing</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
           { label: 'Memories', value: stats?.total_memories || 0, icon: Brain, color: 'text-blue-400' },
           { label: 'Events', value: stats?.total_events || 0, icon: TrendingUp, color: 'text-green-400' },
           { label: 'Opportunities', value: stats?.pending_opportunities || 0, icon: Target, color: 'text-amber-400' },
           { label: 'Journal Entries', value: stats?.journal_entries || 0, icon: BookOpen, color: 'text-purple-400' },
-          { label: 'LinkedIn Time Today', value: stats?.linkedin_minutes_today || 0, icon: Clock, color: 'text-red-400', suffix: ' min' },
         ].map(s => (
           <div key={s.label} className="card flex items-center gap-4">
             <div className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gray-800 ${s.color}`}>
               <s.icon size={22} />
             </div>
             <div>
-              <div className="text-2xl font-bold">{s.value}{s.suffix || ''}</div>
+              <div className="text-2xl font-bold">{s.value}</div>
               <div className="text-sm text-gray-500">{s.label}</div>
             </div>
           </div>

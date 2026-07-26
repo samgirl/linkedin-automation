@@ -21,12 +21,14 @@ export default function Opportunities() {
   const [activeTab, setActiveTab] = useState<'recommended' | 'scan' | 'analyze'>('recommended')
 
   useEffect(() => {
-    api.get('/opportunities/').then(setOpps).finally(() => setLoading(false))
+    api.get('/opportunities/').then(setOpps).catch(() => {}).finally(() => setLoading(false))
   }, [])
 
   const dismiss = async (id: string) => {
-    await api.post(`/opportunities/${id}/dismiss`)
-    setOpps(opps.filter(o => o.id !== id))
+    try {
+      await api.post(`/opportunities/${id}/dismiss`)
+      setOpps(opps.filter(o => o.id !== id))
+    } catch (e) { console.error(e) }
   }
 
   const handleDraft = async (id: string) => {

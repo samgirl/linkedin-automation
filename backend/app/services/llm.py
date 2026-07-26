@@ -10,7 +10,15 @@ class LLMOrchestrator:
         self.api_key = api_key or settings.anthropic_api_key or settings.openai_api_key
         self.provider = provider or settings.default_ai_provider
 
+    def _check_api_key(self):
+        if not self.api_key:
+            raise ValueError(
+                "No AI API key configured. Set ANTHROPIC_API_KEY or OPENAI_API_KEY "
+                "in your .env file."
+            )
+
     async def complete(self, system_prompt: str, user_prompt: str, max_tokens: int = 2000) -> str:
+        self._check_api_key()
         if self.provider == "anthropic":
             return await self._anthropic_complete(system_prompt, user_prompt, max_tokens)
         elif self.provider == "openai":

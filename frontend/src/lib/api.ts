@@ -59,6 +59,7 @@ class ApiClient {
   post<T = any>(path: string, body?: any) { return this.request<T>('POST', path, body) }
   put<T = any>(path: string, body?: any) { return this.request<T>('PUT', path, body) }
   del<T = any>(path: string) { return this.request<T>('DELETE', path) }
+  hasToken(): boolean { return !!this.accessToken }
 }
 
 export const api = new ApiClient()

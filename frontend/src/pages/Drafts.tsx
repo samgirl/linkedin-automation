@@ -34,14 +34,18 @@ export default function Drafts() {
   }
 
   const saveEdit = async (id: string) => {
-    await api.put(`/drafts/${id}`, { content: editContent })
-    setDrafts(drafts.map(d => d.id === id ? { ...d, content: editContent } : d))
-    setEditing(null)
+    try {
+      await api.put(`/drafts/${id}`, { content: editContent })
+      setDrafts(drafts.map(d => d.id === id ? { ...d, content: editContent } : d))
+      setEditing(null)
+    } catch (e) { console.error(e) }
   }
 
   const publishDraft = async (id: string) => {
-    await api.post(`/drafts/${id}/publish`)
-    setDrafts(drafts.map(d => d.id === id ? { ...d, status: 'published' } : d))
+    try {
+      await api.post(`/drafts/${id}/publish`)
+      setDrafts(drafts.map(d => d.id === id ? { ...d, status: 'published' } : d))
+    } catch (e) { console.error(e) }
   }
 
   const typeIcons: Record<string, any> = { post: Pen, comment: MessageSquare, message: UserPlus }

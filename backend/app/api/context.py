@@ -26,7 +26,8 @@ async def get_memories(
         query = query.where(Memory.type == type)
 
     if q:
-        query = query.where(Memory.content.ilike(f"%{q}%"))
+        escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        query = query.where(Memory.content.ilike(f"%{escaped}%", escape="\\"))
 
     query = query.order_by(desc(Memory.created_at)).offset(offset).limit(limit)
     result = await db.execute(query)

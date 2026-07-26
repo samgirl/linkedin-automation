@@ -27,9 +27,9 @@ export default function Context() {
 
   useEffect(() => {
     Promise.all([
-      api.get('/context/memories'),
-      api.get('/context/identity'),
-    ]).then(([m, i]) => { setMemories(m); setIdentity(i) })
+      api.get('/context/memories').catch(() => []),
+      api.get('/context/identity').catch(() => []),
+    ]).then(([m, i]) => { setMemories(m || []); setIdentity(i || []) })
     .finally(() => setLoading(false))
   }, [])
 
@@ -96,7 +96,7 @@ export default function Context() {
                   )}
                 </div>
                 <div className="text-right text-xs text-gray-600 ml-4">
-                  <div>Importance: {(m.importance * 100).toFixed(0)}%</div>
+                  <div>Importance: {((m.importance ?? 0) * 100).toFixed(0)}%</div>
                   <div>{m.created_at ? new Date(m.created_at).toLocaleDateString() : ''}</div>
                 </div>
               </div>
@@ -129,7 +129,7 @@ export default function Context() {
                     {n.data?.description && <p className="mt-1 text-sm text-gray-400">{n.data.description}</p>}
                     {n.data?.evidence && <p className="mt-1 text-xs text-gray-600">Evidence: {n.data.evidence}</p>}
                   </div>
-                  <div className="text-xs text-gray-600">{(n.confidence * 100).toFixed(0)}% confidence</div>
+                  <div className="text-xs text-gray-600">{((n.confidence ?? 0) * 100).toFixed(0)}% confidence</div>
                 </div>
               </div>
             )

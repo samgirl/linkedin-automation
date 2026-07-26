@@ -131,6 +131,23 @@ async def manual_import(req: ManualImportRequest, user: User = Depends(get_curre
     return {"status": "imported", "events_created": len(events)}
 
 
+@router.post("/{connection_id}/sync")
+async def sync_connection(
+    connection_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Connection).where(Connection.id == connection_id, Connection.user_id == user.id)
+    )
+    conn = result.scalar_one_or_none()
+    if not conn:
+        raise HTTPException(status_code=404, detail="Connection not found")
+    from app.utils.helpers import utcnow
+    conn.last_synced_at = utcnow()
+    return {"status": "synced", "provider": conn.provider}
+
+
 @router.delete("/{connection_id}")
 async def disconnect(connection_id: str, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(

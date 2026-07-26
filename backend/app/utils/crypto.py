@@ -4,6 +4,16 @@ from app.config import get_settings
 
 settings = get_settings()
 
+_pwd_context = None
+
+
+def _get_pwd_context():
+    global _pwd_context
+    if _pwd_context is None:
+        from passlib.context import CryptContext
+        _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    return _pwd_context
+
 
 def _get_fernet() -> Fernet:
     key = settings.encryption_key
@@ -32,12 +42,8 @@ def decrypt_token(ciphertext: str) -> str:
 
 
 def hash_password(password: str) -> str:
-    from passlib.context import CryptContext
-    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-    return pwd_context.hash(password)
+    return _get_pwd_context().hash(password)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    from passlib.context import CryptContext
-    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-    return pwd_context.verify(plain_password, hashed_password)
+    return _get_pwd_context().verify(plain_password, hashed_password)

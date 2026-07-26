@@ -31,7 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.history.replaceState({}, '', window.location.pathname)
     }
 
-    if (api['accessToken']) {
+    if (api.hasToken()) {
       api.get('/auth/me')
         .then(u => setUser(u))
         .catch(() => { api.clearTokens() })
