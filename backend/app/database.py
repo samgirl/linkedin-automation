@@ -4,7 +4,16 @@ from app.config import get_settings
 
 settings = get_settings()
 
-engine = create_async_engine(settings.database_url, echo=False, pool_size=20, max_overflow=10)
+is_local = "localhost" in settings.database_url or "127.0.0.1" in settings.database_url
+connect_args = {} if is_local else {"ssl": True}
+
+engine = create_async_engine(
+    settings.database_url,
+    echo=False,
+    pool_size=5,
+    max_overflow=10,
+    connect_args=connect_args,
+)
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 

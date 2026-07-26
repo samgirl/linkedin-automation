@@ -21,13 +21,10 @@ class Settings(BaseSettings):
             v = "postgresql://" + v[len("postgres://"):]
         if v.startswith("postgresql://") and "+asyncpg" not in v:
             v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
-        # asyncpg uses ssl=require, NOT sslmode=require
-        # Strip sslmode param (Neon includes it but asyncpg rejects it)
+        # Strip all SSL params from URL — asyncpg handles SSL via connect_args in database.py
         import re
-        v = re.sub(r'[?&]sslmode=[^&]*', '', v)
+        v = re.sub(r'[?&](sslmode|ssl)=[^&]*', '', v)
         v = v.rstrip('?&')
-        separator = "&" if "?" in v else "?"
-        v = f"{v}{separator}ssl=require"
         return v
     redis_url: str = "redis://localhost:6379/0"
 
