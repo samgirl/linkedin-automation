@@ -44,3 +44,12 @@ async def get_current_user(
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
     return user
+
+
+async def get_current_user_id(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+) -> str:
+    payload = decode_token(credentials.credentials)
+    if payload.get("type") != "access":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")
+    return payload.get("sub")

@@ -19,7 +19,7 @@ class ContextEngine:
             source=source,
             title=title,
             content=content,
-            metadata=metadata or {},
+            extra_data=metadata or {},
         )
         self.db.add(event)
         await self.db.flush()

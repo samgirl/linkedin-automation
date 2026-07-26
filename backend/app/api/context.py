@@ -114,24 +114,12 @@ async def query_context(
 ):
     from app.services.vector_store import VectorStore
     vs = VectorStore()
-    results = await vs.search(user.id, req.query, limit=req.limit)
+    content_results = await vs.search(user.id, req.query, n_results=req.limit)
 
-    memories = []
-    if results.get("ids") and results["ids"][0]:
-        ids = results["ids"][0]
-        result = await db.execute(
-            select(Memory).where(Memory.id.in_(ids), Memory.user_id == user.id)
-        )
-        memory_map = {m.id: m for m in result.scalars().all()}
-        memories = [
-            {
-                "id": mid,
-                "content": memory_map[mid].content if mid in memory_map else "",
-                "type": memory_map[mid].type if mid in memory_map else "",
-                "score": results["distances"][0][i] if results.get("distances") else 0,
-            }
-            for i, mid in enumerate(ids)
-            if mid in memory_map
-        ]
+    memories = [
+        {"content": text, "type": "memory"}
+        for text in content_results
+        if text
+    ]
 
     return {"results": memories, "query": req.query}

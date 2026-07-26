@@ -1,4 +1,5 @@
 import asyncio
+import os
 from logging.config import fileConfig
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
@@ -10,6 +11,21 @@ from app.models import *  # noqa: ensure all models are imported
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
+
+# Override sqlalchemy.url with DATABASE_URL from environment if available
+database_url = os.environ.get("DATABASE_URL", "")
+if database_url:
+    # Normalize postgres:// to postgresql:// (Neon, Heroku)
+    if database_url.startswith("postgres://"):
+        database_url = "postgresql://" + database_url[len("postgres://"):]
+    # Ensure asyncpg driver
+    if "+asyncpg" not in database_url:
+        database_url = database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    # Ensure sslmode=require
+    if "sslmode=" not in database_url:
+        separator = "&" if "?" in database_url else "?"
+        database_url = f"{database_url}{separator}sslmode=require"
+    config.set_main_option("sqlalchemy.url", database_url)
 
 target_metadata = Base.metadata
 

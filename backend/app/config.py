@@ -14,8 +14,17 @@ class Settings(BaseSettings):
     @field_validator("database_url", mode="before")
     @classmethod
     def ensure_async_driver(cls, v: str) -> str:
-        if v and v.startswith("postgresql://") and "+asyncpg" not in v:
-            return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        if not v:
+            return v
+        # Normalize postgres:// to postgresql:// (common with Neon, Heroku)
+        if v.startswith("postgres://"):
+            v = "postgresql://" + v[len("postgres://"):]
+        if v.startswith("postgresql://") and "+asyncpg" not in v:
+            v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        # Ensure sslmode=require for Neon/Render hosted PostgreSQL
+        if "sslmode=" not in v:
+            separator = "&" if "?" in v else "?"
+            v = f"{v}{separator}sslmode=require"
         return v
     redis_url: str = "redis://localhost:6379/0"
 

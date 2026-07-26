@@ -18,7 +18,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
 from app.models.connector import Connection
+from app.services.context_engine import ContextEngine
 from app.services.llm import LLMOrchestrator
+from app.utils.crypto import decrypt_token
 
 
 class LinkedInAPIService:
@@ -33,14 +35,15 @@ class LinkedInAPIService:
     async def get_user_profile(self, user_id: str) -> dict:
         """Get LinkedIn profile data for the user."""
         conn = await self._get_connection(user_id, "linkedin")
-        if not conn or not conn.access_token:
+        if not conn or not conn.access_token_encrypted:
             return {"error": "LinkedIn not connected"}
 
+        access_token = decrypt_token(conn.access_token_encrypted)
         try:
             async with httpx.AsyncClient(timeout=10) as client:
                 resp = await client.get(
                     f"{self.LINKEDIN_API_BASE}/me",
-                    headers={"Authorization": f"Bearer {conn.access_token}"},
+                    headers={"Authorization": f"Bearer {access_token}"},
                 )
                 if resp.status_code == 200:
                     return resp.json()
@@ -51,14 +54,15 @@ class LinkedInAPIService:
     async def get_user_connections(self, user_id: str) -> list:
         """Get user's LinkedIn connections (requires appropriate scopes)."""
         conn = await self._get_connection(user_id, "linkedin")
-        if not conn or not conn.access_token:
+        if not conn or not conn.access_token_encrypted:
             return []
 
+        access_token = decrypt_token(conn.access_token_encrypted)
         try:
             async with httpx.AsyncClient(timeout=10) as client:
                 resp = await client.get(
                     f"{self.LINKEDIN_API_BASE}/connections",
-                    headers={"Authorization": f"Bearer {conn.access_token}"},
+                    headers={"Authorization": f"Bearer {access_token}"},
                 )
                 if resp.status_code == 200:
                     data = resp.json()
@@ -131,7 +135,7 @@ Return as JSON."""
             select(Connection).where(
                 Connection.user_id == user_id,
                 Connection.provider == provider,
-                Connection.is_active == True,
+                Connection.status == "active",
             )
         )
         return result.scalar_one_or_none()
