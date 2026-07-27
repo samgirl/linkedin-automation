@@ -12,6 +12,7 @@ interface AuthContextType {
   user: User | null
   loading: boolean
   login: (email: string, password: string) => Promise<void>
+  loginWithTokens: (access: string, refresh: string) => void
   register: (email: string, name: string, password: string) => Promise<void>
   logout: () => void
 }
@@ -23,14 +24,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const access = params.get('access')
-    const refresh = params.get('refresh')
-    if (access && refresh) {
-      api.setTokens(access, refresh)
-      window.history.replaceState({}, '', window.location.pathname)
-    }
-
     if (api.hasToken()) {
       api.get('/auth/me')
         .then(u => setUser(u))
@@ -47,6 +40,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(resp.user)
   }, [])
 
+  const loginWithTokens = useCallback((access: string, refresh: string) => {
+    api.setTokens(access, refresh)
+    api.get('/auth/me').then(u => setUser(u)).catch(() => {})
+  }, [])
+
   const register = useCallback(async (email: string, name: string, password: string) => {
     const resp = await api.post('/auth/register', { email, name, password })
     api.setTokens(resp.access_token, resp.refresh_token)
@@ -59,7 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, loginWithTokens, register, logout }}>
       {children}
     </AuthContext.Provider>
   )

@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './hooks/useAuth'
 import Layout from './components/Layout'
 import Login from './pages/Login'
+import AuthCallback from './pages/AuthCallback'
 import Dashboard from './pages/Dashboard'
 import Context from './pages/Context'
 import Opportunities from './pages/Opportunities'
@@ -23,7 +24,7 @@ export default function App() {
     <AuthProvider>
       <Routes>
         <Route path="/login" element={<Login />} />
-        <Route path="/auth/callback" element={<Login />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route index element={<Dashboard />} />
           <Route path="context" element={<Context />} />
@@ -34,6 +35,7 @@ export default function App() {
           <Route path="scanner" element={<Scanner />} />
           <Route path="settings" element={<Settings />} />
         </Route>
+        <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </AuthProvider>
   )
