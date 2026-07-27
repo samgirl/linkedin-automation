@@ -16,10 +16,17 @@ export default function Dashboard() {
   const [recentEntries, setRecentEntries] = useState<any[]>([])
 
   useEffect(() => {
+    api.get('/auth/onboarding-status').then(r => {
+      if (!r.completed) {
+        navigate('/onboarding')
+        return
+      }
+    }).catch(() => {})
+
     Promise.all([
-      api.get('/dashboard/briefing').catch((e) => { console.error(e); return null }),
-      api.get('/dashboard/stats').catch((e) => { console.error(e); return null }),
-      api.get('/scanner/trends').catch((e) => { console.error(e); return { trends: [] } }),
+      api.get('/dashboard/briefing').catch(() => null),
+      api.get('/dashboard/stats').catch(() => null),
+      api.get('/scanner/trends').catch(() => ({ trends: [] })),
       api.get('/journal/?limit=3').catch(() => []),
     ]).then(([b, s, t, entries]) => {
       setBriefing(b)
@@ -41,14 +48,15 @@ export default function Dashboard() {
     setScanningTrends(false)
   }
 
-  const hasData = stats && (stats.total_events > 0 || stats.total_memories > 0 || stats.journal_entries > 0)
+  const hasData = stats && (stats.total_memories > 0 || stats.journal_entries > 0)
+  const name = user?.name?.split(' ')[0] || 'there'
 
   if (loading) return <div className="flex h-64 items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" /></div>
 
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold">Welcome back, {user?.name?.split(' ')[0]}</h1>
+        <h1 className="text-2xl font-bold">Welcome back, {name}</h1>
         <p className="text-gray-500">Here's your daily briefing</p>
       </div>
 
@@ -63,42 +71,44 @@ export default function Dashboard() {
       {!hasData && (
         <div className="card border-brand-600/30 bg-brand-600/5">
           <div className="mb-3 font-semibold text-brand-400">Get Started with PROS</div>
-          <p className="mb-4 text-sm text-gray-400">Your dashboard is empty. Here's how to get started:</p>
+          <p className="mb-4 text-sm text-gray-400">Your dashboard is empty. Here's how to get value from PROS:</p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <button onClick={() => navigate('/journal')} className="flex items-center gap-3 rounded-lg bg-gray-800/50 p-3 text-left transition-colors hover:bg-gray-800">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-500/10 text-purple-400"><Pen size={18} /></div>
               <div><div className="text-sm font-medium">Add a Journal Entry</div><div className="text-xs text-gray-500">Capture what you're working on</div></div>
             </button>
-            <button onClick={() => navigate('/connectors')} className="flex items-center gap-3 rounded-lg bg-gray-800/50 p-3 text-left transition-colors hover:bg-gray-800">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/10 text-green-400"><Plug size={18} /></div>
-              <div><div className="text-sm font-medium">Connect an Account</div><div className="text-xs text-gray-500">Import ChatGPT or Claude data</div></div>
+            <button onClick={() => navigate('/opportunities')} className="flex items-center gap-3 rounded-lg bg-gray-800/50 p-3 text-left transition-colors hover:bg-gray-800">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10 text-amber-400"><Target size={18} /></div>
+              <div><div className="text-sm font-medium">Generate Opportunities</div><div className="text-xs text-gray-500">See what to post about</div></div>
             </button>
             <button onClick={() => navigate('/settings')} className="flex items-center gap-3 rounded-lg bg-gray-800/50 p-3 text-left transition-colors hover:bg-gray-800">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10 text-amber-400"><Sparkles size={18} /></div>
-              <div><div className="text-sm font-medium">Add AI API Key</div><div className="text-xs text-gray-500">Enable AI-powered features</div></div>
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/10 text-green-400"><Sparkles size={18} /></div>
+              <div><div className="text-sm font-medium">Add AI API Key</div><div className="text-xs text-gray-500">Unlock AI-powered features</div></div>
             </button>
           </div>
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {[
-          { label: 'Memories', value: stats?.total_memories || 0, icon: Brain, color: 'text-blue-400' },
-          { label: 'Events', value: stats?.total_events || 0, icon: TrendingUp, color: 'text-green-400' },
-          { label: 'Opportunities', value: stats?.pending_opportunities || 0, icon: Target, color: 'text-amber-400' },
-          { label: 'Journal Entries', value: stats?.journal_entries || 0, icon: BookOpen, color: 'text-purple-400' },
-        ].map(s => (
-          <div key={s.label} className="card flex items-center gap-4">
-            <div className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gray-800 ${s.color}`}>
-              <s.icon size={22} />
+      {hasData && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            { label: 'Memories', value: stats?.total_memories || 0, icon: Brain, color: 'text-blue-400' },
+            { label: 'Events', value: stats?.total_events || 0, icon: TrendingUp, color: 'text-green-400' },
+            { label: 'Opportunities', value: stats?.pending_opportunities || 0, icon: Target, color: 'text-amber-400' },
+            { label: 'Journal Entries', value: stats?.journal_entries || 0, icon: BookOpen, color: 'text-purple-400' },
+          ].map(s => (
+            <div key={s.label} className="card flex items-center gap-4">
+              <div className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gray-800 ${s.color}`}>
+                <s.icon size={22} />
+              </div>
+              <div>
+                <div className="text-2xl font-bold">{s.value}</div>
+                <div className="text-sm text-gray-500">{s.label}</div>
+              </div>
             </div>
-            <div>
-              <div className="text-2xl font-bold">{s.value}</div>
-              <div className="text-sm text-gray-500">{s.label}</div>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {briefing && (
         <div className="card">
@@ -107,11 +117,8 @@ export default function Dashboard() {
             <h2 className="text-lg font-semibold">Today's Briefing</h2>
           </div>
           <div className="prose prose-invert max-w-none text-sm leading-relaxed text-gray-300 whitespace-pre-wrap">
-            {briefing.text || briefing.briefing || 'No briefing available yet. Add some context to get started.'}
+            {briefing.text || briefing.briefing || 'No briefing available yet.'}
           </div>
-          {briefing.memories_count === 0 && (
-            <p className="mt-3 text-xs text-gray-600">Add journal entries and connect accounts to get personalized briefings.</p>
-          )}
         </div>
       )}
 
@@ -122,7 +129,7 @@ export default function Dashboard() {
               <BookOpen size={20} className="text-purple-400" />
               <h2 className="text-lg font-semibold">Recent Journal Entries</h2>
             </div>
-            <button onClick={() => navigate('/journal')} className="text-xs text-brand-400 hover:text-brand-300">View all →</button>
+            <button onClick={() => navigate('/journal')} className="text-xs text-brand-400 hover:text-brand-300">View all</button>
           </div>
           <div className="space-y-2">
             {recentEntries.map((e: any) => (
@@ -150,7 +157,7 @@ export default function Dashboard() {
           </button>
         </div>
         {trends.length === 0 ? (
-          <p className="text-sm text-gray-500">No trends loaded yet. Click Refresh to scan (requires AI API key).</p>
+          <p className="text-sm text-gray-500">No trends loaded yet. Click Refresh to scan.</p>
         ) : (
           <div className="space-y-3">
             {trends.slice(0, 5).map((t: any, i: number) => (
@@ -161,9 +168,6 @@ export default function Dashboard() {
                 <div className="flex-1">
                   <div className="font-medium text-sm">{t.title || t.topic}</div>
                   <div className="text-xs text-gray-500 mt-0.5">{t.summary || t.why_now}</div>
-                  {t.content_angle && (
-                    <div className="mt-1 text-xs text-brand-400">Angle: {t.content_angle}</div>
-                  )}
                 </div>
                 <span className={`badge text-xs ${t.urgency === 'breaking' ? 'bg-red-500/10 text-red-400' : t.urgency === 'trending' ? 'bg-amber-500/10 text-amber-400' : 'bg-gray-500/10 text-gray-400'}`}>
                   {t.urgency || 'trending'}
@@ -177,9 +181,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <button onClick={() => navigate('/opportunities')} className="card group flex items-center justify-between transition-all hover:border-brand-600">
           <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-600/10 text-brand-400">
-              <Target size={22} />
-            </div>
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-600/10 text-brand-400"><Target size={22} /></div>
             <div className="text-left">
               <div className="font-semibold">View Opportunities</div>
               <div className="text-sm text-gray-500">See what actions are recommended</div>
@@ -187,12 +189,9 @@ export default function Dashboard() {
           </div>
           <ArrowRight size={18} className="text-gray-600 group-hover:text-brand-400" />
         </button>
-
         <button onClick={() => navigate('/journal')} className="card group flex items-center justify-between transition-all hover:border-brand-600">
           <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-600/10 text-purple-400">
-              <BookOpen size={22} />
-            </div>
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-600/10 text-purple-400"><BookOpen size={22} /></div>
             <div className="text-left">
               <div className="font-semibold">Add to Journal</div>
               <div className="text-sm text-gray-500">Capture what you worked on today</div>
@@ -200,12 +199,9 @@ export default function Dashboard() {
           </div>
           <ArrowRight size={18} className="text-gray-600 group-hover:text-brand-400" />
         </button>
-
         <button onClick={() => navigate('/scanner')} className="card group flex items-center justify-between transition-all hover:border-brand-600">
           <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-600/10 text-green-400">
-              <Search size={22} />
-            </div>
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-600/10 text-green-400"><Search size={22} /></div>
             <div className="text-left">
               <div className="font-semibold">Scan LinkedIn Posts</div>
               <div className="text-sm text-gray-500">Analyze posts and get comment ideas</div>

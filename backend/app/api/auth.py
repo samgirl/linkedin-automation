@@ -154,6 +154,62 @@ async def get_me(user: User = Depends(get_current_user)):
     return _user_dict(user)
 
 
+class OnboardingRequest(BaseModel):
+    role: str = ""
+    industry: str = ""
+    interests: list[str] = []
+    goals: list[str] = []
+    expertise: str = ""
+
+
+@router.get("/onboarding-status")
+async def onboarding_status(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    from app.models.context import Identity
+    result = await db.execute(select(Identity).where(Identity.user_id == user.id))
+    identities = result.scalars().all()
+    has_role = any(i.type == "role" for i in identities)
+    return {"completed": has_role, "identity_count": len(identities)}
+
+
+@router.post("/onboarding")
+async def complete_onboarding(req: OnboardingRequest, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    from app.models.context import Identity, Interest, Memory
+
+    if req.role:
+        db.add(Identity(user_id=user.id, type="role", name=req.role, data={"description": f"User's professional role: {req.role}"}, confidence=0.9))
+
+    if req.industry:
+        db.add(Identity(user_id=user.id, type="industry", name=req.industry, data={"description": f"User works in {req.industry}"}, confidence=0.9))
+
+    if req.expertise:
+        for skill in [s.strip() for s in req.expertise.split(",") if s.strip()]:
+            db.add(Identity(user_id=user.id, type="expertise", name=skill, data={"description": f"Expertise in {skill}"}, confidence=0.8))
+
+    for interest in req.interests:
+        db.add(Interest(user_id=user.id, topic=interest.strip(), category="declared", confidence=0.8, source="declared"))
+
+    for goal in req.goals:
+        db.add(Identity(user_id=user.id, type="goal", name=goal.strip(), data={"description": f"Goal: {goal.strip()}"}, confidence=0.7))
+
+    summary_parts = []
+    if req.role: summary_parts.append(f"Role: {req.role}")
+    if req.industry: summary_parts.append(f"Industry: {req.industry}")
+    if req.interests: summary_parts.append(f"Interests: {', '.join(req.interests)}")
+    if req.goals: summary_parts.append(f"Goals: {', '.join(req.goals)}")
+
+    db.add(Memory(
+        user_id=user.id,
+        type="fact",
+        content=f"Onboarding completed. {' | '.join(summary_parts)}",
+        source="onboarding",
+        confidence=0.9,
+    ))
+
+    await db.commit()
+
+    return {"status": "onboarding_complete"}
+
+
 # --- LinkedIn OAuth ---
 @router.get("/linkedin")
 async def linkedin_login():

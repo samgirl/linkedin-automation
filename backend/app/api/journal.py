@@ -3,12 +3,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 from pydantic import BaseModel
 from typing import Optional
+import logging
 
 from app.database import get_db
 from app.models.user import User
 from app.models.journal import JournalEntry, SavedContent
 from app.utils.token import get_current_user
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/journal", tags=["journal"])
 
 
@@ -91,6 +93,14 @@ async def create_entry(
     from app.services.context_engine import ContextEngine
     engine = ContextEngine(db)
     await engine.ingest_from_journal(entry)
+
+    try:
+        from app.services.opportunity_radar import OpportunityRadar
+        radar = OpportunityRadar(db)
+        await radar.analyze_and_build_identity(user.id)
+        await radar.find_opportunities(user.id)
+    except Exception as e:
+        logger.warning(f"Auto-opportunity generation after journal entry failed: {e}")
 
     return {
         "id": entry.id,

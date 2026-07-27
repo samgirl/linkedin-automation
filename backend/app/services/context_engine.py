@@ -152,29 +152,43 @@ class ContextEngine:
         return memory
 
     async def _update_identity(self, user_id: str, event: Event):
-        """Update user identity model based on accumulated events."""
-        # Check if identity entry exists for this event type
-        result = await self.db.execute(
-            select(Identity).where(
-                Identity.user_id == user_id,
-                Identity.type == event.type,
-            )
-        )
-        identity = result.scalar_one_or_none()
+        if not event.content:
+            return
 
-        if identity:
-            # Update confidence and data
-            identity.confidence = min(1.0, identity.confidence + 0.05)
-            identity.data = {**identity.data, "last_event": event.title} if isinstance(identity.data, dict) else {"last_event": event.title}
-        else:
-            identity = Identity(
-                user_id=user_id,
-                type=event.type,
-                name=event.title or event.type,
-                data={"source": event.source, "count": 1},
-                confidence=0.3,
-            )
-            self.db.add(identity)
+        content_lower = event.content.lower()
+
+        skill_keywords = {
+            "engineering": ["code", "programming", "software", "api", "database", "deploy", "engineering", "backend", "frontend", "devops"],
+            "marketing": ["marketing", "brand", "content", "campaign", "seo", "social media", "audience", "growth"],
+            "sales": ["sales", "revenue", "pipeline", "prospecting", "deal", "closing", "lead", "conversion"],
+            "leadership": ["team", "leadership", "managing", "strategy", "vision", "culture", "hiring"],
+            "product": ["product", "feature", "user", "design", "ux", "roadmap", "sprint", "launch"],
+            "finance": ["finance", "investment", "fundraising", "revenue", "valuation", "budget"],
+            "ai/ml": ["ai", "machine learning", "model", "neural", "llm", "gpt", "training", "data science"],
+        }
+
+        for skill, keywords in skill_keywords.items():
+            matches = sum(1 for kw in keywords if kw in content_lower)
+            if matches >= 2:
+                result = await self.db.execute(
+                    select(Identity).where(
+                        Identity.user_id == user_id,
+                        Identity.type == "expertise",
+                        Identity.name == skill,
+                    )
+                )
+                node = result.scalar_one_or_none()
+                if node:
+                    node.confidence = min(1.0, node.confidence + 0.05)
+                else:
+                    self.db.add(Identity(
+                        user_id=user_id,
+                        type="expertise",
+                        name=skill,
+                        data={"description": f"Demonstrates {skill} expertise", "evidence": event.content[:200]},
+                        confidence=0.4,
+                    ))
+
         await self.db.flush()
 
     async def get_identity_summary(self, user_id: str) -> str:
@@ -189,29 +203,32 @@ class ContextEngine:
         return "\n".join(lines)
 
     async def get_interests(self, user_id: str) -> dict:
-        """Get user interests from identity and memories."""
+        from app.models.context import Interest
         result = await self.db.execute(
-            select(Memory).where(
-                Memory.user_id == user_id,
-                Memory.archived == False,
-            ).order_by(Memory.importance.desc()).limit(20)
+            select(Interest).where(Interest.user_id == user_id).order_by(Interest.confidence.desc()).limit(10)
         )
-        memories = result.scalars().all()
+        declared = result.scalars().all()
+        if declared:
+            topics = [i.topic for i in declared]
+            return {
+                "primary_topics": ", ".join(topics),
+                "all_tags": {i.topic: i.confidence for i in declared},
+            }
 
-        # Extract interests from tags and content
+        mem_result = await self.db.execute(
+            select(Memory).where(Memory.user_id == user_id, Memory.archived == False).order_by(Memory.importance.desc()).limit(20)
+        )
+        memories = mem_result.scalars().all()
         all_tags = []
         for m in memories:
             if m.tags:
                 all_tags.extend(m.tags)
-
         tag_freq = {}
         for t in all_tags:
             tag_freq[t] = tag_freq.get(t, 0) + 1
-
         top_tags = sorted(tag_freq.keys(), key=lambda x: tag_freq[x], reverse=True)[:10]
-
         return {
-            "primary_topics": ", ".join(top_tags) if top_tags else "technology, business, startups",
+            "primary_topics": ", ".join(top_tags) if top_tags else "",
             "all_tags": tag_freq,
         }
 

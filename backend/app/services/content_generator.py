@@ -117,16 +117,48 @@ class ContentGenerator:
 
     async def generate_briefing(self, user_id: str) -> dict:
         context = await self.context_engine.get_user_context_for_generation(user_id)
+        interests = await self.context_engine.get_interests(user_id)
+        memory_count = len(context.get("memories", []))
+        identity_count = len(context.get("identity", []))
+
+        if not self.llm.has_key:
+            topics = interests.get("primary_topics", "")
+            tips = [
+                "Share a lesson you learned this week — authenticity drives engagement.",
+                "Comment on 3 posts in your industry before posting your own.",
+                "Write about a problem you solved recently — specific stories perform best.",
+                "Tag someone who inspired you this week and explain why.",
+                "Share a hot take on a trending topic in your industry.",
+            ]
+            tip = tips[hash(user_id) % len(tips)]
+
+            if memory_count == 0:
+                progress = "You're just getting started! Add some journal entries about your work to unlock personalized insights."
+            elif memory_count < 5:
+                progress = f"Great start! You have {memory_count} memories stored. Keep adding journal entries to build your profile."
+            else:
+                progress = f"Your profile has {memory_count} memories and {identity_count} identity traits. You're building real momentum!"
+
+            text = f"**Your Progress:** {progress}\n\n"
+            if topics:
+                text += f"**Your Focus Areas:** {topics}\n\n"
+            text += f"**Today's Tip:** {tip}\n\n"
+            text += "**Quick Actions:**\n"
+            text += "- Add a journal entry about something you worked on\n"
+            text += "- Generate opportunities to see what to post about\n"
+            text += "- Check the Scanner for trending topics"
+            return {"text": text, "memories_count": memory_count, "identity_count": identity_count}
+
         user_prompt = f"My recent context:\n{json.dumps(context, indent=2)[:4000]}"
 
         try:
             briefing_text = await self.llm.complete(BRIEFING_SYSTEM_PROMPT, user_prompt)
         except Exception as e:
             logger.warning(f"Briefing generation failed: {type(e).__name__}: {e}")
-            briefing_text = "Welcome back! Add more context about your work to get personalized briefings."
+            briefing_text = "Add more context about your work to get personalized briefings."
 
         return {
             "text": briefing_text,
-            "memories_count": len(context.get("memories", [])),
-            "identity_count": len(context.get("identity", [])),
+            "memories_count": memory_count,
+            "identity_count": identity_count,
         }

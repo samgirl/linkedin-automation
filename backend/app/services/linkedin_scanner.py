@@ -85,19 +85,19 @@ Suggest 1 post idea (2-3 sentences) the user could write that responds to or exp
         }
 
     async def scan_for_opportunities(self, user_id: str, topic: str = None) -> list:
-        """Scan for posts where the user can add value."""
+        interests = await self.context_engine.get_interests(user_id)
+        search_topic = topic or interests.get("primary_topics", "your industry")
+
         if not self.llm.has_key:
-            return []
+            return [
+                {"url": "", "author": "Suggested", "title": f"Search LinkedIn for '{search_topic}' posts", "description": f"Look for trending posts about {search_topic} and add your perspective", "difficulty": "easy"},
+            ]
 
         user = await self.db.get(User, user_id)
         if not user:
             return []
 
         identity = await self.context_engine.get_identity_summary(user_id)
-        interests = await self.context_engine.get_interests(user_id)
-
-        # Build search query from user's expertise
-        search_topic = topic or interests.get("primary_topics", "business, startups, technology")
 
         # Use web search to find relevant LinkedIn posts
         search_prompt = f"""You are a LinkedIn engagement strategist. The user's expertise: {identity}
@@ -121,9 +121,15 @@ Return as JSON array."""
         return opportunities if isinstance(opportunities, list) else []
 
     async def generate_opportunities(self, user_id: str) -> list:
-        """Generate AI-based opportunity suggestions based on user context."""
+        interests = await self.context_engine.get_interests(user_id)
+        topics = interests.get("primary_topics", "your industry")
+
         if not self.llm.has_key:
-            return []
+            return [
+                {"type": "post_idea", "title": f"Share a lesson from your work in {topics}", "description": "Write about a real challenge you solved this week. Specific stories with concrete outcomes get the most engagement.", "suggested_action": "Open LinkedIn and write a post about a real problem you solved", "priority": "high"},
+                {"type": "comment_opportunity", "title": f"Engage with leaders in {topics}", "description": "Find 3 posts from people in your industry and leave thoughtful, specific comments.", "suggested_action": "Search LinkedIn for posts about your topics and comment on 3", "priority": "medium"},
+                {"type": "post_idea", "title": "Share an unpopular opinion", "description": "What's a common practice in your field that you disagree with? Share a respectful but firm contrarian take.", "suggested_action": "Think of one thing everyone does wrong and write about it", "priority": "high"},
+            ]
 
         identity = await self.context_engine.get_identity_summary(user_id)
         memories = await self.context_engine.get_recent_memories(user_id, limit=10)

@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './hooks/useAuth'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 import AuthCallback from './pages/AuthCallback'
+import Onboarding from './pages/Onboarding'
 import Dashboard from './pages/Dashboard'
 import Context from './pages/Context'
 import Opportunities from './pages/Opportunities'
@@ -25,6 +26,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
         <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route index element={<Dashboard />} />
           <Route path="context" element={<Context />} />

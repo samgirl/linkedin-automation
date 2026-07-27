@@ -44,9 +44,23 @@ class TrendScanner:
         memories = await self.context_engine.get_recent_memories(user_id, limit=5)
 
         if not self.llm.has_key:
+            topics = interests.get("primary_topics", "")
+            tips = [
+                "Post about a challenge you're currently facing in your work.",
+                "Comment on 3 posts from people in your industry today.",
+                "Share a tool or resource that's made you more productive recently.",
+                "Write about a mistake you made and what you learned from it.",
+            ]
+            tip = tips[hash(user_id) % len(tips)]
+            brief = f"**Your Focus:** {topics if topics else 'Set up your interests in Settings for personalized trends'}\n\n"
+            brief += f"**Today's Suggestion:** {tip}\n\n"
+            brief += "**Action Items:**\n"
+            brief += "- Add a journal entry about today's work\n"
+            brief += "- Engage with 3 posts in your feed\n"
+            brief += "- Write one post about your expertise"
             return {
                 "date": datetime.now(timezone.utc).date().isoformat(),
-                "briefing": "AI briefing requires an API key. Set ANTHROPIC_API_KEY or OPENAI_API_KEY to enable AI features.",
+                "briefing": brief,
                 "trends": trends,
                 "generated_at": datetime.now(timezone.utc).isoformat(),
             }
@@ -88,12 +102,15 @@ Keep it punchy and actionable. No fluff."""
         }
 
     async def scan_trends(self, user_id: str) -> list:
-        """Scan for trending topics in the user's industry."""
-        if not self.llm.has_key:
-            return []
-
         interests = await self.context_engine.get_interests(user_id)
         topics = interests.get("primary_topics", "AI, startups, technology, business")
+
+        if not self.llm.has_key:
+            return [
+                {"title": f"AI developments in {topics}", "summary": "AI continues to reshape industries — share your perspective on how it affects your work.", "urgency": "trending"},
+                {"title": "Leadership and team building", "summary": "Leadership content consistently performs well — share a lesson from your management experience.", "urgency": "evergreen"},
+                {"title": "Industry insights and predictions", "summary": "Share your professional predictions for the next quarter based on what you're seeing in your work.", "urgency": "trending"},
+            ]
 
         # Use LLM to generate what's trending based on training knowledge
         # (In production, we'd call real news APIs)
