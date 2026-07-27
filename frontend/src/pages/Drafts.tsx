@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../lib/api'
-import { FileText, Copy, Check, Send, Sparkles, Pen, MessageSquare, UserPlus, Edit3 } from 'lucide-react'
+import { FileText, Copy, Check, Send, Sparkles, Pen, MessageSquare, UserPlus, Edit3, AlertCircle } from 'lucide-react'
 
 export default function Drafts() {
   const [drafts, setDrafts] = useState<any[]>([])
@@ -11,19 +11,28 @@ export default function Drafts() {
   const [copied, setCopied] = useState<string | null>(null)
   const [editing, setEditing] = useState<string | null>(null)
   const [editContent, setEditContent] = useState('')
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    api.get('/drafts/').then(setDrafts).catch(() => {}).finally(() => setLoading(false))
+    api.get('/drafts/').then(setDrafts).catch((e) => setError('Failed to load drafts: ' + e.message)).finally(() => setLoading(false))
   }, [])
 
   const generate = async () => {
     if (!topic.trim()) return
     setGenerating(true)
+    setError('')
     try {
       const draft = await api.post('/opportunities/generate', { type, topic })
       setDrafts([draft, ...drafts])
       setTopic('')
-    } catch (e) { console.error(e) }
+    } catch (e: any) {
+      const msg = e.message || ''
+      if (msg.includes('API key')) {
+        setError('AI features require an API key. Go to Settings → API Keys to add your OpenAI or Anthropic key.')
+      } else {
+        setError('Failed to generate draft: ' + msg)
+      }
+    }
     setGenerating(false)
   }
 
@@ -38,14 +47,20 @@ export default function Drafts() {
       await api.put(`/drafts/${id}`, { content: editContent })
       setDrafts(drafts.map(d => d.id === id ? { ...d, content: editContent } : d))
       setEditing(null)
-    } catch (e) { console.error(e) }
+    } catch (e: any) {
+      setError('Failed to save edit: ' + (e.message || 'Unknown error'))
+    }
   }
 
-  const publishDraft = async (id: string) => {
+  const publishDraft = async (id: string, content: string) => {
     try {
       await api.post(`/drafts/${id}/publish`)
       setDrafts(drafts.map(d => d.id === id ? { ...d, status: 'published' } : d))
-    } catch (e) { console.error(e) }
+      navigator.clipboard.writeText(content)
+      alert('Draft marked as published and copied to clipboard. Paste it into LinkedIn to post.')
+    } catch (e: any) {
+      setError('Failed to publish: ' + (e.message || 'Unknown error'))
+    }
   }
 
   const typeIcons: Record<string, any> = { post: Pen, comment: MessageSquare, message: UserPlus }
@@ -58,6 +73,14 @@ export default function Drafts() {
         <h1 className="text-2xl font-bold">Drafts</h1>
         <p className="text-gray-500">Generate and manage your LinkedIn content</p>
       </div>
+
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg bg-red-500/10 border border-red-500/20 p-3 text-sm text-red-400">
+          <AlertCircle size={16} className="flex-shrink-0" />
+          <span className="flex-1">{error}</span>
+          <button onClick={() => setError('')} className="text-red-400 hover:text-red-300">&times;</button>
+        </div>
+      )}
 
       <div className="card">
         <h3 className="mb-3 font-medium text-gray-300">Generate New Draft</h3>
@@ -76,6 +99,7 @@ export default function Drafts() {
             Generate
           </button>
         </div>
+        <p className="mt-2 text-xs text-gray-600">Requires an AI API key. Add one in Settings.</p>
       </div>
 
       <div className="space-y-4">
@@ -120,7 +144,7 @@ export default function Drafts() {
                   <Edit3 size={12} /> Edit
                 </button>
                 {d.status !== 'published' && (
-                  <button onClick={() => publishDraft(d.id)} className="btn-primary text-xs flex items-center gap-1">
+                  <button onClick={() => publishDraft(d.id, d.content)} className="btn-primary text-xs flex items-center gap-1">
                     <Send size={12} /> Publish
                   </button>
                 )}

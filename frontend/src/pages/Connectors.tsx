@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../lib/api'
-import { Plug, MessageSquare, Brain, RefreshCw, Trash2, Key, Upload, ExternalLink, AlertCircle } from 'lucide-react'
+import { Plug, MessageSquare, Brain, RefreshCw, Trash2, Key, Upload, ExternalLink, AlertCircle, Check } from 'lucide-react'
 
 const providerConfig: Record<string, { icon: any; color: string; label: string; description: string }> = {
   linkedin: { icon: () => <span className="text-lg font-bold">in</span>, color: 'text-blue-400 bg-blue-400/10', label: 'LinkedIn', description: 'Sync your profile, posts, and activity' },
@@ -14,43 +14,50 @@ export default function Connectors() {
   const [loading, setLoading] = useState(true)
   const [apiKey, setApiKey] = useState('')
   const [connectingProvider, setConnectingProvider] = useState<string | null>(null)
-  const [importFile, setImportFile] = useState<{ provider: string; file: File | null }>({ provider: '', file: null })
   const [syncing, setSyncing] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
 
   useEffect(() => {
-    api.get('/connectors/').then(setConnections).catch(() => {}).finally(() => setLoading(false))
+    api.get('/connectors/').then(setConnections).catch((e) => setError('Failed to load connectors: ' + e.message)).finally(() => setLoading(false))
   }, [])
 
   const connectLinkedIn = async () => {
     setError('')
+    setSuccess('')
     try {
       const resp = await api.get('/auth/linkedin')
       window.location.href = resp.url
     } catch (e: any) {
-      setError(e.message || 'LinkedIn is not configured yet. Add LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET to the server.')
+      setError(e.message || 'LinkedIn is not configured. Add LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET to the server.')
     }
   }
 
   const connectGoogle = async () => {
     setError('')
+    setSuccess('')
     try {
       const resp = await api.get('/auth/google')
       window.location.href = resp.url
     } catch (e: any) {
-      setError(e.message || 'Google is not configured yet. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to the server.')
+      setError(e.message || 'Google is not configured. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to the server.')
     }
   }
 
   const connectWithApiKey = async (provider: string) => {
     if (!apiKey.trim()) return
     setConnectingProvider(provider)
+    setError('')
+    setSuccess('')
     try {
       await api.post(`/connectors/${provider}/connect`, { api_key: apiKey })
       const updated = await api.get('/connectors/')
       setConnections(updated)
       setApiKey('')
-    } catch (e) { console.error(e) }
+      setSuccess(`${provider === 'chatgpt' ? 'ChatGPT' : 'Claude'} API key saved. This key can be used for AI features in Scanner and Drafts.`)
+    } catch (e: any) {
+      setError(`Failed to save ${provider} API key: ` + (e.message || 'Unknown error'))
+    }
     setConnectingProvider(null)
   }
 
@@ -61,27 +68,46 @@ export default function Connectors() {
     input.onchange = async (e: any) => {
       const file = e.target.files[0]
       if (!file) return
+      setError('')
+      setSuccess('')
       const text = await file.text()
       try {
-        await api.post('/connectors/import', { provider, data: text, filename: file.name })
-        alert('Import successful!')
-      } catch (err: any) { alert('Import failed: ' + err.message) }
+        const result = await api.post('/connectors/import', { provider, data: text, filename: file.name })
+        setSuccess(`Import successful! ${result.events_created} conversations imported into your context.`)
+        // Refresh stats
+        const updated = await api.get('/connectors/')
+        setConnections(updated)
+      } catch (err: any) {
+        setError('Import failed: ' + (err.message || 'Unknown error'))
+      }
     }
     input.click()
   }
 
   const sync = async (connectionId: string) => {
     setSyncing(connectionId)
-    try { await api.post(`/connectors/${connectionId}/sync`) } catch (e) { console.error(e) }
+    setError('')
+    setSuccess('')
+    try {
+      await api.post(`/connectors/${connectionId}/sync`)
+      setSuccess('Sync completed. For ChatGPT/Claude, use the JSON import to bring in conversation data.')
+    } catch (e: any) {
+      setError('Sync failed: ' + (e.message || 'Unknown error'))
+    }
     setSyncing(null)
   }
 
   const disconnect = async (connectionId: string) => {
     if (!confirm('Disconnect this account?')) return
+    setError('')
+    setSuccess('')
     try {
       await api.del(`/connectors/${connectionId}`)
       setConnections(connections.filter(c => c.id !== connectionId))
-    } catch (e) { console.error(e) }
+      setSuccess('Disconnected successfully.')
+    } catch (e: any) {
+      setError('Disconnect failed: ' + (e.message || 'Unknown error'))
+    }
   }
 
   if (loading) return <div className="flex h-64 items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" /></div>
@@ -93,14 +119,23 @@ export default function Connectors() {
         <p className="text-gray-500">Connect your accounts to build context</p>
       </div>
 
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg bg-red-500/10 border border-red-500/20 p-3 text-sm text-red-400">
+          <AlertCircle size={16} className="flex-shrink-0" />
+          <span className="flex-1">{error}</span>
+          <button onClick={() => setError('')} className="text-red-400 hover:text-red-300">&times;</button>
+        </div>
+      )}
+
+      {success && (
+        <div className="flex items-center gap-2 rounded-lg bg-green-500/10 border border-green-500/20 p-3 text-sm text-green-400">
+          <Check size={16} className="flex-shrink-0" />
+          <span className="flex-1">{success}</span>
+          <button onClick={() => setSuccess('')} className="text-green-400 hover:text-green-300">&times;</button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {error && (
-          <div className="col-span-full flex items-center gap-2 rounded-lg bg-red-500/10 border border-red-500/20 p-3 text-sm text-red-400">
-            <AlertCircle size={16} />
-            {error}
-            <button onClick={() => setError('')} className="ml-auto text-red-400 hover:text-red-300">&times;</button>
-          </div>
-        )}
         {Object.entries(providerConfig).map(([key, conf]) => {
           const conn = connections.find(c => c.provider === key)
           const Icon = conf.icon
@@ -118,13 +153,18 @@ export default function Connectors() {
                   <p className="mt-1 text-sm text-gray-500">{conf.description}</p>
 
                   {conn ? (
-                    <div className="mt-3 flex gap-2">
-                      <button onClick={() => sync(conn.id)} disabled={syncing === conn.id} className="btn-secondary text-xs flex items-center gap-1">
-                        <RefreshCw size={12} className={syncing === conn.id ? 'animate-spin' : ''} /> Sync
-                      </button>
-                      <button onClick={() => disconnect(conn.id)} className="btn-danger text-xs flex items-center gap-1">
-                        <Trash2 size={12} /> Disconnect
-                      </button>
+                    <div className="mt-3 space-y-2">
+                      <div className="flex gap-2">
+                        <button onClick={() => sync(conn.id)} disabled={syncing === conn.id} className="btn-secondary text-xs flex items-center gap-1">
+                          <RefreshCw size={12} className={syncing === conn.id ? 'animate-spin' : ''} /> Sync
+                        </button>
+                        <button onClick={() => disconnect(conn.id)} className="btn-danger text-xs flex items-center gap-1">
+                          <Trash2 size={12} /> Disconnect
+                        </button>
+                      </div>
+                      {(key === 'chatgpt' || key === 'claude') && (
+                        <p className="text-xs text-gray-600">To import conversations, use "Or import JSON export" below.</p>
+                      )}
                     </div>
                   ) : (
                     <div className="mt-3 space-y-3">
@@ -149,10 +189,12 @@ export default function Connectors() {
                               {connectingProvider === key ? 'Connecting...' : 'Connect'}
                             </button>
                           </div>
+                          <p className="mt-1 text-xs text-gray-600">This key is used for AI features (trends, drafts, briefings).</p>
                           <div className="mt-2">
                             <button onClick={() => handleFileImport(key)} className="btn-secondary text-xs flex items-center gap-1">
                               <Upload size={12} /> Or import JSON export
                             </button>
+                            <p className="mt-1 text-xs text-gray-600">Export your {conf.label} data and upload the JSON file to import conversations into your context.</p>
                           </div>
                         </div>
                       )}

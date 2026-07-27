@@ -32,8 +32,9 @@ class ContextEngine:
                 embedding_id = await vs.store_memory(user_id, memory.id, memory.content, {"type": memory.type})
                 memory.embedding_id = embedding_id
                 await self.db.flush()
-            except Exception:
-                pass  # Vector store is optional
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).debug(f"Vector store store failed (optional): {type(e).__name__}")
 
         await self._update_identity(user_id, event)
 

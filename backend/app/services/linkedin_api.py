@@ -12,6 +12,7 @@ For V1, we support:
 3. User-provided search terms → web search results
 """
 import httpx
+import logging
 from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +22,8 @@ from app.models.connector import Connection
 from app.services.context_engine import ContextEngine
 from app.services.llm import LLMOrchestrator
 from app.utils.crypto import decrypt_token
+
+logger = logging.getLogger(__name__)
 
 
 class LinkedInAPIService:
@@ -47,8 +50,8 @@ class LinkedInAPIService:
                 )
                 if resp.status_code == 200:
                     return resp.json()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"LinkedIn profile fetch failed: {type(e).__name__}")
         return {"error": "Failed to fetch profile"}
 
     async def get_user_connections(self, user_id: str) -> list:
@@ -67,8 +70,8 @@ class LinkedInAPIService:
                 if resp.status_code == 200:
                     data = resp.json()
                     return data.get("elements", [])
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"LinkedIn connections fetch failed: {type(e).__name__}")
         return []
 
     async def analyze_post(self, post_url: str) -> dict:
@@ -125,8 +128,8 @@ Return as JSON."""
                                 return text[start:end]
                     # Fallback
                     return text[:3000]
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"LinkedIn post scrape failed: {type(e).__name__}")
         return None
 
     async def _get_connection(self, user_id: str, provider: str) -> Optional[Connection]:

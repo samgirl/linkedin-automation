@@ -181,6 +181,7 @@ Return as JSON array."""
                                 return text[start:end]
                     # Fallback: return first 2000 chars of text
                     return text[:2000]
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).debug(f"LinkedIn post fetch failed: {type(e).__name__}")
         return None

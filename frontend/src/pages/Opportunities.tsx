@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../lib/api'
-import { Target, MessageSquare, Pen, UserPlus, Share2, Check, X, Sparkles, TrendingUp, Search, ExternalLink } from 'lucide-react'
+import { Target, MessageSquare, Pen, UserPlus, Share2, Check, X, Sparkles, TrendingUp, Search, ExternalLink, AlertCircle } from 'lucide-react'
 
 const typeConfig: Record<string, { icon: any; color: string; label: string }> = {
   post_idea: { icon: Pen, color: 'text-blue-400 bg-blue-400/10', label: 'Post Idea' },
@@ -19,24 +19,35 @@ export default function Opportunities() {
   const [analyzing, setAnalyzing] = useState(false)
   const [analysisResult, setAnalysisResult] = useState<any>(null)
   const [activeTab, setActiveTab] = useState<'recommended' | 'scan' | 'analyze'>('recommended')
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    api.get('/opportunities/').then(setOpps).catch(() => {}).finally(() => setLoading(false))
+    api.get('/opportunities/').then(setOpps).catch((e) => setError('Failed to load opportunities: ' + e.message)).finally(() => setLoading(false))
   }, [])
 
   const dismiss = async (id: string) => {
     try {
       await api.post(`/opportunities/${id}/dismiss`)
       setOpps(opps.filter(o => o.id !== id))
-    } catch (e) { console.error(e) }
+    } catch (e: any) {
+      setError('Failed to dismiss: ' + (e.message || 'Unknown error'))
+    }
   }
 
   const handleDraft = async (id: string) => {
     setGenerating(id)
+    setError('')
     try {
       const draft = await api.post(`/opportunities/${id}/draft`)
       setDraftPreview(draft)
-    } catch (e) { console.error(e) }
+    } catch (e: any) {
+      const msg = e.message || ''
+      if (msg.includes('API key')) {
+        setError('AI features require an API key. Go to Settings → API Keys to add your OpenAI or Anthropic key.')
+      } else {
+        setError('Failed to generate draft: ' + msg)
+      }
+    }
     setGenerating(null)
   }
 
@@ -44,19 +55,42 @@ export default function Opportunities() {
     if (!postUrl.trim()) return
     setAnalyzing(true)
     setAnalysisResult(null)
+    setError('')
     try {
       const result = await api.post('/scanner/analyze-post', { url: postUrl })
-      setAnalysisResult(result)
-    } catch (e) { console.error(e) }
+      if (result.error) {
+        setError(result.error)
+      } else {
+        setAnalysisResult(result)
+      }
+    } catch (e: any) {
+      const msg = e.message || ''
+      if (msg.includes('API key')) {
+        setError('AI features require an API key. Go to Settings → API Keys.')
+      } else {
+        setError('Failed to analyze: ' + msg)
+      }
+    }
     setAnalyzing(false)
   }
 
   const generateOpps = async () => {
     setLoading(true)
+    setError('')
     try {
       const result = await api.post('/scanner/generate-opportunities')
       setOpps(result?.opportunities || [])
-    } catch (e) { console.error(e) }
+      if (!result?.opportunities?.length) {
+        setError('No opportunities generated. Add your expertise to Context and an AI API key in Settings.')
+      }
+    } catch (e: any) {
+      const msg = e.message || ''
+      if (msg.includes('API key')) {
+        setError('AI features require an API key. Go to Settings → API Keys.')
+      } else {
+        setError('Failed to generate opportunities: ' + msg)
+      }
+    }
     setLoading(false)
   }
 
@@ -73,6 +107,14 @@ export default function Opportunities() {
           <Sparkles size={16} /> Generate More
         </button>
       </div>
+
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg bg-red-500/10 border border-red-500/20 p-3 text-sm text-red-400">
+          <AlertCircle size={16} className="flex-shrink-0" />
+          <span className="flex-1">{error}</span>
+          <button onClick={() => setError('')} className="text-red-400 hover:text-red-300">&times;</button>
+        </div>
+      )}
 
       <div className="flex gap-2 border-b border-gray-800 pb-2">
         {[
@@ -128,10 +170,21 @@ export default function Opportunities() {
           <p className="mb-3 text-sm text-gray-500">AI scans for posts in your space where you can add value.</p>
           <button onClick={async () => {
             setLoading(true)
+            setError('')
             try {
               const result = await api.post('/scanner/scan-opportunities')
               setOpps(result?.opportunities || [])
-            } catch (e) { console.error(e) }
+              if (!result?.opportunities?.length) {
+                setError('No opportunities found. Add more context to your profile first.')
+              }
+            } catch (e: any) {
+              const msg = e.message || ''
+              if (msg.includes('API key')) {
+                setError('AI features require an API key. Go to Settings → API Keys.')
+              } else {
+                setError('Failed to scan: ' + msg)
+              }
+            }
             setLoading(false)
           }} className="btn-primary flex items-center gap-2">
             <Search size={14} /> Scan Now
@@ -148,7 +201,6 @@ export default function Opportunities() {
           <div className="whitespace-pre-wrap rounded-lg bg-gray-800 p-4 text-sm text-gray-300">{draftPreview.content}</div>
           <div className="mt-3 flex gap-2">
             <button onClick={() => { navigator.clipboard.writeText(draftPreview.content) }} className="btn-secondary text-xs">Copy</button>
-            <button className="btn-primary text-xs">Publish to LinkedIn</button>
           </div>
         </div>
       )}
@@ -157,7 +209,8 @@ export default function Opportunities() {
         opps.length === 0 ? (
           <div className="card text-center text-gray-500 py-12">
             <Target size={48} className="mx-auto mb-4 text-gray-700" />
-            <p>No opportunities yet. Connect your accounts and add context to get recommendations.</p>
+            <p>No opportunities yet.</p>
+            <p className="mt-2 text-xs text-gray-600">Click "Generate More" to get AI-powered recommendations. Requires an API key in Settings.</p>
           </div>
         ) : (
           <div className="space-y-4">

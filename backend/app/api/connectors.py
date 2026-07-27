@@ -1,4 +1,5 @@
 import secrets
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -11,6 +12,7 @@ from app.models.connector import Connection
 from app.utils.token import get_current_user
 from app.utils.crypto import encrypt_token, decrypt_token
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
 router = APIRouter(prefix="/api/connectors", tags=["connectors"])
 
@@ -143,9 +145,24 @@ async def sync_connection(
     conn = result.scalar_one_or_none()
     if not conn:
         raise HTTPException(status_code=404, detail="Connection not found")
+
     from app.utils.helpers import utcnow
     conn.last_synced_at = utcnow()
-    return {"status": "synced", "provider": conn.provider}
+
+    # For ChatGPT/Claude with API keys, sync is limited — conversations must be imported via JSON.
+    # For LinkedIn/Google with OAuth tokens, we could fetch recent activity but the APIs require
+    # additional permissions not yet configured. For now, we update the timestamp and return
+    # guidance to the user.
+    provider_info = {
+        "chatgpt": "ChatGPT sync updates the connection timestamp. To import conversations, use the JSON import feature.",
+        "claude": "Claude sync updates the connection timestamp. To import conversations, use the JSON import feature.",
+        "linkedin": "LinkedIn sync updates the connection timestamp. Full profile sync requires additional API permissions.",
+        "google": "Google sync updates the connection timestamp. Full calendar sync requires additional API permissions.",
+    }
+    message = provider_info.get(conn.provider, "Sync completed.")
+
+    logger.info(f"Synced {conn.provider} connection {connection_id} for user {user.id}")
+    return {"status": "synced", "provider": conn.provider, "message": message}
 
 
 @router.delete("/{connection_id}")

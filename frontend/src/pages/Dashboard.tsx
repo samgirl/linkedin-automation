@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
 import { useAuth } from '../hooks/useAuth'
-import { Target, Brain, BookOpen, TrendingUp, Sparkles, ArrowRight, Flame, Search } from 'lucide-react'
+import { Target, Brain, BookOpen, TrendingUp, Sparkles, ArrowRight, Flame, Search, AlertCircle, Plug, Pen } from 'lucide-react'
 
 export default function Dashboard() {
   const { user } = useAuth()
@@ -12,27 +12,36 @@ export default function Dashboard() {
   const [trends, setTrends] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [scanningTrends, setScanningTrends] = useState(false)
+  const [error, setError] = useState('')
+  const [recentEntries, setRecentEntries] = useState<any[]>([])
 
   useEffect(() => {
     Promise.all([
-      api.get('/dashboard/briefing').catch(() => null),
-      api.get('/dashboard/stats').catch(() => null),
-      api.get('/scanner/trends').catch(() => ({ trends: [] })),
-    ]).then(([b, s, t]) => {
+      api.get('/dashboard/briefing').catch((e) => { console.error(e); return null }),
+      api.get('/dashboard/stats').catch((e) => { console.error(e); return null }),
+      api.get('/scanner/trends').catch((e) => { console.error(e); return { trends: [] } }),
+      api.get('/journal/?limit=3').catch(() => []),
+    ]).then(([b, s, t, entries]) => {
       setBriefing(b)
       setStats(s)
       setTrends(t?.trends || [])
+      setRecentEntries(entries || [])
     }).finally(() => setLoading(false))
   }, [])
 
   const refreshTrends = async () => {
     setScanningTrends(true)
+    setError('')
     try {
       const t = await api.get('/scanner/trends')
       setTrends(t?.trends || [])
-    } catch (e) { console.error(e) }
+    } catch (e: any) {
+      setError('Failed to load trends: ' + (e.message || 'Unknown error'))
+    }
     setScanningTrends(false)
   }
+
+  const hasData = stats && (stats.total_events > 0 || stats.total_memories > 0 || stats.journal_entries > 0)
 
   if (loading) return <div className="flex h-64 items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" /></div>
 
@@ -42,6 +51,35 @@ export default function Dashboard() {
         <h1 className="text-2xl font-bold">Welcome back, {user?.name?.split(' ')[0]}</h1>
         <p className="text-gray-500">Here's your daily briefing</p>
       </div>
+
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg bg-red-500/10 border border-red-500/20 p-3 text-sm text-red-400">
+          <AlertCircle size={16} className="flex-shrink-0" />
+          <span className="flex-1">{error}</span>
+          <button onClick={() => setError('')} className="text-red-400 hover:text-red-300">&times;</button>
+        </div>
+      )}
+
+      {!hasData && (
+        <div className="card border-brand-600/30 bg-brand-600/5">
+          <div className="mb-3 font-semibold text-brand-400">Get Started with PROS</div>
+          <p className="mb-4 text-sm text-gray-400">Your dashboard is empty. Here's how to get started:</p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <button onClick={() => navigate('/journal')} className="flex items-center gap-3 rounded-lg bg-gray-800/50 p-3 text-left transition-colors hover:bg-gray-800">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-500/10 text-purple-400"><Pen size={18} /></div>
+              <div><div className="text-sm font-medium">Add a Journal Entry</div><div className="text-xs text-gray-500">Capture what you're working on</div></div>
+            </button>
+            <button onClick={() => navigate('/connectors')} className="flex items-center gap-3 rounded-lg bg-gray-800/50 p-3 text-left transition-colors hover:bg-gray-800">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/10 text-green-400"><Plug size={18} /></div>
+              <div><div className="text-sm font-medium">Connect an Account</div><div className="text-xs text-gray-500">Import ChatGPT or Claude data</div></div>
+            </button>
+            <button onClick={() => navigate('/settings')} className="flex items-center gap-3 rounded-lg bg-gray-800/50 p-3 text-left transition-colors hover:bg-gray-800">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10 text-amber-400"><Sparkles size={18} /></div>
+              <div><div className="text-sm font-medium">Add AI API Key</div><div className="text-xs text-gray-500">Enable AI-powered features</div></div>
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
@@ -71,6 +109,32 @@ export default function Dashboard() {
           <div className="prose prose-invert max-w-none text-sm leading-relaxed text-gray-300 whitespace-pre-wrap">
             {briefing.text || briefing.briefing || 'No briefing available yet. Add some context to get started.'}
           </div>
+          {briefing.memories_count === 0 && (
+            <p className="mt-3 text-xs text-gray-600">Add journal entries and connect accounts to get personalized briefings.</p>
+          )}
+        </div>
+      )}
+
+      {recentEntries.length > 0 && (
+        <div className="card">
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <BookOpen size={20} className="text-purple-400" />
+              <h2 className="text-lg font-semibold">Recent Journal Entries</h2>
+            </div>
+            <button onClick={() => navigate('/journal')} className="text-xs text-brand-400 hover:text-brand-300">View all →</button>
+          </div>
+          <div className="space-y-2">
+            {recentEntries.map((e: any) => (
+              <div key={e.id} className="rounded-lg bg-gray-800/50 p-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="badge bg-gray-800 text-gray-400 text-xs">{e.entry_type}</span>
+                  <span className="text-xs text-gray-600">{e.created_at ? new Date(e.created_at).toLocaleDateString() : ''}</span>
+                </div>
+                <p className="text-sm text-gray-300 line-clamp-2">{e.content}</p>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -86,7 +150,7 @@ export default function Dashboard() {
           </button>
         </div>
         {trends.length === 0 ? (
-          <p className="text-sm text-gray-500">No trends loaded yet. Click Refresh to scan.</p>
+          <p className="text-sm text-gray-500">No trends loaded yet. Click Refresh to scan (requires AI API key).</p>
         ) : (
           <div className="space-y-3">
             {trends.slice(0, 5).map((t: any, i: number) => (

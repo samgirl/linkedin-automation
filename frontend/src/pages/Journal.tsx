@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { api } from '../lib/api'
-import { BookOpen, Plus, Link as LinkIcon, FileText, Mic, MicOff, Send, Users, Clock, Lightbulb } from 'lucide-react'
+import { BookOpen, Plus, Link as LinkIcon, FileText, Mic, MicOff, Send, Users, Clock, Lightbulb, AlertCircle } from 'lucide-react'
 
 const entryTypes = [
   { type: 'text', icon: FileText, label: 'Text' },
@@ -24,6 +24,8 @@ export default function Journal() {
   const [isRecording, setIsRecording] = useState(false)
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
   const [recordingTime, setRecordingTime] = useState(0)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<BlobPart[]>([])
   const timerRef = useRef<any>(null)
@@ -60,8 +62,7 @@ export default function Journal() {
       setRecordingTime(0)
       timerRef.current = setInterval(() => setRecordingTime(t => t + 1), 1000)
     } catch (e) {
-      console.error('Microphone access denied:', e)
-      alert('Please allow microphone access for voice journal entries.')
+      setError('Microphone access denied. Please allow microphone access for voice journal entries.')
     }
   }
 
@@ -74,31 +75,43 @@ export default function Journal() {
   const submitVoice = async () => {
     if (!audioBlob) return
     setSubmitting(true)
+    setError('')
     try {
       const reader = new FileReader()
       reader.onloadend = async () => {
         const base64 = (reader.result as string).split(',')[1]
-        const entry = await api.post('/journal/', {
-          content: content || `Voice entry (${recordingTime}s)`,
-          entry_type: 'voice',
-          audio_data: base64,
-          tags: ['voice'],
-        })
-        setEntries([entry, ...entries])
-        setContent('')
-        setAudioBlob(null)
+        try {
+          const entry = await api.post('/journal/', {
+            content: content || `Voice entry (${recordingTime}s)`,
+            entry_type: 'voice',
+            audio_data: base64,
+            tags: ['voice'],
+          })
+          setEntries([entry, ...entries])
+          setContent('')
+          setAudioBlob(null)
+          setSuccess('Voice entry saved!')
+          setTimeout(() => setSuccess(''), 3000)
+        } catch (e: any) {
+          setError('Failed to save voice entry: ' + (e.message || 'Unknown error'))
+        }
         setSubmitting(false)
       }
       reader.readAsDataURL(audioBlob)
-    } catch (e) { console.error(e); setSubmitting(false) }
+    } catch (e: any) {
+      setError('Failed to process audio: ' + (e.message || 'Unknown error'))
+      setSubmitting(false)
+    }
   }
 
   const submitText = async () => {
-    if (!content.trim()) return
+    if (!content.trim() && entryType !== 'link') return
+    if (entryType === 'link' && !url.trim() && !content.trim()) return
     setSubmitting(true)
+    setError('')
     try {
       const payload: any = {
-        content,
+        content: content.trim() || `Link: ${url}`,
         entry_type: entryType,
       }
       if (entryType === 'meeting_note') {
@@ -116,18 +129,27 @@ export default function Journal() {
       setMeetingTitle('')
       setMeetingParticipants('')
       setMeetingDuration('')
-    } catch (e) { console.error(e) }
+      setSuccess('Entry saved! It will appear in your context.')
+      setTimeout(() => setSuccess(''), 3000)
+    } catch (e: any) {
+      setError('Failed to save entry: ' + (e.message || 'Unknown error'))
+    }
     setSubmitting(false)
   }
 
   const addLink = async () => {
     if (!url.trim()) return
     setSubmitting(true)
+    setError('')
     try {
       const item = await api.post('/journal/content', { url, title: url })
       setEntries([{ ...item, content: url, entry_type: 'saved_link', created_at: item.created_at }, ...entries])
       setUrl('')
-    } catch (e) { console.error(e) }
+      setSuccess('Link saved to your context!')
+      setTimeout(() => setSuccess(''), 3000)
+    } catch (e: any) {
+      setError('Failed to save link: ' + (e.message || 'Unknown error'))
+    }
     setSubmitting(false)
   }
 
@@ -145,6 +167,21 @@ export default function Journal() {
         <h1 className="text-2xl font-bold">Journal</h1>
         <p className="text-gray-500">Capture your daily context — what you worked on, learned, found interesting</p>
       </div>
+
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg bg-red-500/10 border border-red-500/20 p-3 text-sm text-red-400">
+          <AlertCircle size={16} className="flex-shrink-0" />
+          <span className="flex-1">{error}</span>
+          <button onClick={() => setError('')} className="text-red-400 hover:text-red-300">&times;</button>
+        </div>
+      )}
+
+      {success && (
+        <div className="flex items-center gap-2 rounded-lg bg-green-500/10 border border-green-500/20 p-3 text-sm text-green-400">
+          <span className="flex-1">{success}</span>
+          <button onClick={() => setSuccess('')} className="text-green-400 hover:text-green-300">&times;</button>
+        </div>
+      )}
 
       {stats && (
         <div className="flex items-center gap-4">
@@ -222,26 +259,26 @@ export default function Journal() {
                 <input className="input" placeholder="Duration (min)" type="number" value={meetingDuration} onChange={e => setMeetingDuration(e.target.value)} />
               </div>
             )}
+            {entryType === 'link' && (
+              <input className="input" placeholder="https://..." value={url} onChange={e => setUrl(e.target.value)} />
+            )}
             <textarea
               className="input min-h-[120px] resize-y"
               placeholder={
                 entryType === 'meeting_note' ? 'Paste meeting notes or transcript...'
                 : entryType === 'idea' ? 'What idea do you want to capture?'
-                : entryType === 'link' ? 'Add notes about this link...'
+                : entryType === 'link' ? 'Add notes about this link (optional)...'
                 : 'What did you work on today? What did you learn?'
               }
               value={content}
               onChange={e => setContent(e.target.value)}
             />
-            {entryType === 'link' && (
-              <input className="input" placeholder="https://..." value={url} onChange={e => setUrl(e.target.value)} />
-            )}
           </div>
         )}
 
         {entryType !== 'voice' && (
           <div className="mt-3 flex justify-end">
-            <button onClick={submitText} disabled={submitting || !content.trim()} className="btn-primary flex items-center gap-2">
+            <button onClick={submitText} disabled={submitting || (!content.trim() && entryType !== 'link') || (entryType === 'link' && !url.trim() && !content.trim())} className="btn-primary flex items-center gap-2">
               {submitting ? <div className="h-4 w-4 animate-spin rounded-full border border-white border-t-transparent" /> : <Send size={14} />}
               Add Entry
             </button>
@@ -265,6 +302,7 @@ export default function Journal() {
           <div className="card text-center text-gray-500 py-8">
             <BookOpen size={40} className="mx-auto mb-3 text-gray-700" />
             <p>No entries yet. Start journaling to build your context.</p>
+            <p className="mt-2 text-xs text-gray-600">Your entries create memories that power AI features.</p>
           </div>
         ) : entries.map(e => (
           <div key={e.id} className="card">

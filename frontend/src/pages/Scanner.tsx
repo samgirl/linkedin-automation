@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { api } from '../lib/api'
-import { Search, ExternalLink, Copy, Check, Flame, TrendingUp, Newspaper, Sparkles } from 'lucide-react'
+import { Search, ExternalLink, Copy, Check, Flame, TrendingUp, Newspaper, AlertCircle } from 'lucide-react'
 
 export default function Scanner() {
   const [postUrl, setPostUrl] = useState('')
@@ -12,33 +12,68 @@ export default function Scanner() {
   const [newsQuery, setNewsQuery] = useState('')
   const [news, setNews] = useState<any[]>([])
   const [loadingNews, setLoadingNews] = useState(false)
+  const [error, setError] = useState('')
 
   const analyzePost = async () => {
     if (!postUrl.trim()) return
     setAnalyzing(true)
     setAnalysis(null)
+    setError('')
     try {
       const result = await api.post('/scanner/analyze-post', { url: postUrl })
-      setAnalysis(result)
-    } catch (e) { console.error(e) }
+      if (result.error) {
+        setError(result.error)
+      } else {
+        setAnalysis(result)
+      }
+    } catch (e: any) {
+      const msg = e.message || ''
+      if (msg.includes('API key')) {
+        setError('AI features require an API key. Go to Settings → API Keys to add your OpenAI or Anthropic key.')
+      } else {
+        setError('Failed to analyze post: ' + msg)
+      }
+    }
     setAnalyzing(false)
   }
 
   const loadLinkedInTrends = async () => {
     setLoadingTrends(true)
+    setError('')
     try {
       const result = await api.get('/scanner/linkedin-trends')
       setLinkedinTrends(result?.trends || [])
-    } catch (e) { console.error(e) }
+      if (!result?.trends?.length) {
+        setError('No trends found. Add your expertise to Context first, or add an AI API key in Settings.')
+      }
+    } catch (e: any) {
+      const msg = e.message || ''
+      if (msg.includes('API key')) {
+        setError('AI features require an API key. Go to Settings → API Keys.')
+      } else {
+        setError('Failed to load trends: ' + msg)
+      }
+    }
     setLoadingTrends(false)
   }
 
   const scanNews = async () => {
     setLoadingNews(true)
+    setError('')
     try {
       const result = await api.post('/scanner/scan-news', { query: newsQuery || undefined })
       setNews(result?.articles || [])
-    } catch (e) { console.error(e) }
+      if (!result?.articles?.length) {
+        setError('No articles found. Add an AI API key in Settings for news scanning.')
+      }
+    } catch (e: any) {
+      const msg = e.message || ''
+      if (msg.includes('API key')) {
+        setError('AI features require an API key. Go to Settings → API Keys.')
+      } else {
+        setError('Failed to scan news: ' + msg)
+      }
+    }
     setLoadingNews(false)
   }
 
@@ -54,6 +89,14 @@ export default function Scanner() {
         <h1 className="text-2xl font-bold">LinkedIn Scanner</h1>
         <p className="text-gray-500">Analyze posts, find trends, and discover engagement opportunities</p>
       </div>
+
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg bg-red-500/10 border border-red-500/20 p-3 text-sm text-red-400">
+          <AlertCircle size={16} className="flex-shrink-0" />
+          <span className="flex-1">{error}</span>
+          <button onClick={() => setError('')} className="text-red-400 hover:text-red-300">&times;</button>
+        </div>
+      )}
 
       {/* Post URL Analyzer */}
       <div className="card">
@@ -124,7 +167,7 @@ export default function Scanner() {
         </div>
 
         {linkedinTrends.length === 0 ? (
-          <p className="text-sm text-gray-500">Click "Scan Trends" to find trending topics in your industry.</p>
+          <p className="text-sm text-gray-500">Click "Scan Trends" to find trending topics in your industry. Requires an AI API key.</p>
         ) : (
           <div className="space-y-3">
             {linkedinTrends.map((t: any, i: number) => (

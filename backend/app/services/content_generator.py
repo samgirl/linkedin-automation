@@ -1,10 +1,13 @@
 import json
+import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
 from app.models.opportunity import Opportunity, Draft
 from app.services.context_engine import ContextEngine
 from app.services.llm import LLMOrchestrator
+
+logger = logging.getLogger(__name__)
 
 
 POST_SYSTEM_PROMPT = """You are a LinkedIn content strategist. Generate LinkedIn posts based on the user's context.
@@ -118,7 +121,8 @@ class ContentGenerator:
 
         try:
             briefing_text = await self.llm.complete(BRIEFING_SYSTEM_PROMPT, user_prompt)
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Briefing generation failed: {type(e).__name__}: {e}")
             briefing_text = "Welcome back! Add more context about your work to get personalized briefings."
 
         return {

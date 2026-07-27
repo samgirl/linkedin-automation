@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../lib/api'
-import { Search, Brain, User, Briefcase, Heart, MessageSquare, Target } from 'lucide-react'
+import { Search, Brain, User, Briefcase, Heart, MessageSquare, Target, AlertCircle } from 'lucide-react'
 
 const typeIcons: Record<string, any> = {
   expertise: Briefcase, interest: Heart, communication_style: MessageSquare, goal: Target, value: Heart, industry: Briefcase,
@@ -24,21 +24,26 @@ export default function Context() {
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
   const [searchResults, setSearchResults] = useState<any[] | null>(null)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     Promise.all([
-      api.get('/context/memories').catch(() => []),
-      api.get('/context/identity').catch(() => []),
+      api.get('/context/memories').catch((e) => { console.error(e); return [] }),
+      api.get('/context/identity').catch((e) => { console.error(e); return [] }),
     ]).then(([m, i]) => { setMemories(m || []); setIdentity(i || []) })
     .finally(() => setLoading(false))
   }, [])
 
   const handleSemanticSearch = async () => {
     if (!query.trim()) { setSearchResults(null); return }
+    setError('')
     try {
       const resp = await api.post('/context/query', { query, limit: 10 })
       setSearchResults(resp.results || [])
-    } catch { setSearchResults([]) }
+    } catch (e: any) {
+      setError('Search failed: ' + (e.message || 'Unknown error'))
+      setSearchResults([])
+    }
   }
 
   const displayedMemories = searchResults || (search ? memories.filter(m => m.content.toLowerCase().includes(search.toLowerCase())) : memories)
@@ -62,6 +67,13 @@ export default function Context() {
           <button onClick={handleSemanticSearch} className="btn-primary">Search</button>
         </div>
       </div>
+
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg bg-red-500/10 border border-red-500/20 p-3 text-sm text-red-400">
+          <AlertCircle size={16} className="flex-shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
 
       <div className="flex gap-1 rounded-lg bg-gray-900 p-1">
         {(['memories', 'identity'] as const).map(t => (

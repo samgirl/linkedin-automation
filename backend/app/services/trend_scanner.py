@@ -9,6 +9,7 @@ Sources:
 4. Twitter/X trending (via web search)
 """
 import asyncio
+import logging
 import httpx
 from datetime import datetime, timezone
 from typing import Optional
@@ -18,6 +19,8 @@ from app.models.user import User
 from app.services.llm import LLMOrchestrator
 from app.services.context_engine import ContextEngine
 from app.services.vector_store import VectorStore
+
+logger = logging.getLogger(__name__)
 
 
 class TrendScanner:
@@ -73,7 +76,8 @@ Keep it punchy and actionable. No fluff."""
 
         try:
             briefing = await self.llm.generate(briefing_prompt, max_tokens=1500)
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Briefing generation failed: {type(e).__name__}: {e}")
             briefing = "AI briefing unavailable. Set an API key to enable AI-powered briefings."
 
         return {
@@ -110,7 +114,8 @@ Focus on real, specific topics (not generic). Return as JSON array."""
                 max_tokens=2000,
                 response_format="json"
             )
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Trend scan failed: {type(e).__name__}: {e}")
             return []
 
         return trends if isinstance(trends, list) else []
@@ -143,7 +148,8 @@ Return as JSON array."""
                 max_tokens=2000,
                 response_format="json"
             )
-        except Exception:
+        except Exception as e:
+            logger.warning(f"News scan failed: {type(e).__name__}: {e}")
             return []
 
         return articles if isinstance(articles, list) else []
@@ -174,7 +180,8 @@ Return as JSON array."""
                 max_tokens=2000,
                 response_format="json"
             )
-        except Exception:
+        except Exception as e:
+            logger.warning(f"LinkedIn trends failed: {type(e).__name__}: {e}")
             return []
 
         return trends if isinstance(trends, list) else []

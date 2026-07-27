@@ -116,5 +116,5 @@ class VectorStore:
             try:
                 collection = self._get_collection(user_id)
                 collection.delete(ids=[memory_id])
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"ChromaDB delete failed (optional): {type(e).__name__}")
