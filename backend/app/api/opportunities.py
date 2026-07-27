@@ -101,7 +101,7 @@ async def generate_draft(
     gen = ContentGenerator(db)
     try:
         draft = await gen.generate_for_opportunity(user.id, opp)
-    except ValueError as e:
+    except (ValueError, Exception) as e:
         raise HTTPException(status_code=400, detail=str(e))
 
     return {
@@ -123,7 +123,7 @@ async def generate_standalone_draft(
     gen = ContentGenerator(db)
     try:
         draft = await gen.generate_standalone(user.id, req.type, req.topic, req.extra_context)
-    except ValueError as e:
+    except (ValueError, Exception) as e:
         raise HTTPException(status_code=400, detail=str(e))
 
     return {
