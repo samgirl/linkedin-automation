@@ -1,5 +1,9 @@
 import secrets
 import time
+import hmac
+import hashlib
+import base64
+import json
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse, HTMLResponse
@@ -19,19 +23,41 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
-# In-memory OAuth state store (expires after 5 min)
-_oauth_states: dict[str, float] = {}
+
+def _sign_state(provider: str) -> str:
+    """Create an HMAC-signed state token. No server-side storage needed."""
+    payload = f"{provider}:{int(time.time())}"
+    sig = hmac.new(
+        settings.jwt_secret_key.encode(),
+        payload.encode(),
+        hashlib.sha256,
+    ).hexdigest()
+    token = base64.urlsafe_b64encode(json.dumps({"p": payload, "s": sig}).encode()).decode()
+    return token
 
 
-def _store_state(state: str) -> None:
-    _oauth_states[state] = time.time()
-
-
-def _validate_state(state: str) -> bool:
-    if not state or state not in _oauth_states:
+def _validate_state(state: str, expected_provider: str) -> bool:
+    """Validate HMAC-signed state token. Survives server restarts."""
+    if not state:
         return False
-    created = _oauth_states.pop(state, 0)
-    return time.time() - created < 300  # 5 min expiry
+    try:
+        data = json.loads(base64.urlsafe_b64decode(state))
+        payload = data["p"]
+        sig = data["s"]
+        expected_sig = hmac.new(
+            settings.jwt_secret_key.encode(),
+            payload.encode(),
+            hashlib.sha256,
+        ).hexdigest()
+        if not hmac.compare_digest(sig, expected_sig):
+            return False
+        parts = payload.split(":", 1)
+        if len(parts) != 2 or parts[0] != expected_provider:
+            return False
+        created_ts = int(parts[1])
+        return time.time() - created_ts < 600  # 10 min expiry
+    except Exception:
+        return False
 
 
 def _error_page(title: str, detail: str) -> HTMLResponse:
@@ -133,8 +159,7 @@ async def get_me(user: User = Depends(get_current_user)):
 async def linkedin_login():
     if not settings.linkedin_client_id:
         raise HTTPException(status_code=503, detail="LinkedIn login is not configured. The server is missing LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET.")
-    state = secrets.token_urlsafe(32)
-    _store_state(state)
+    state = _sign_state("linkedin")
     url = (
         f"https://www.linkedin.com/oauth/v2/authorization?"
         f"response_type=code&client_id={settings.linkedin_client_id}"
@@ -150,8 +175,7 @@ async def linkedin_login():
 async def google_login():
     if not settings.google_client_id:
         raise HTTPException(status_code=503, detail="Google login is not configured. The server is missing GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.")
-    state = secrets.token_urlsafe(32)
-    _store_state(state)
+    state = _sign_state("google")
     url = (
         f"https://accounts.google.com/o/oauth2/v2/auth?"
         f"response_type=code&client_id={settings.google_client_id}"
@@ -171,7 +195,7 @@ async def google_callback(code: str = "", state: str = "", error: str = "", db: 
     if not code:
         return _error_page("Google Login Failed", "No authorization code received from Google. Please try again.")
 
-    if not _validate_state(state):
+    if not _validate_state(state, "google"):
         return _error_page("Google Login Failed", "Invalid or expired state. This may be a CSRF attempt. Please try again.")
 
     if not settings.google_client_id or not settings.google_client_secret:
@@ -246,7 +270,7 @@ async def linkedin_callback(code: str = "", state: str = "", error: str = "", db
     if not code:
         return _error_page("LinkedIn Login Failed", "No authorization code received from LinkedIn. Please try again.")
 
-    if not _validate_state(state):
+    if not _validate_state(state, "linkedin"):
         return _error_page("LinkedIn Login Failed", "Invalid or expired state. This may be a CSRF attempt. Please try again.")
 
     if not settings.linkedin_client_id or not settings.linkedin_client_secret:
