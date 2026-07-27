@@ -1,8 +1,11 @@
 import os
 import sys
+import logging
 import traceback
 from pathlib import Path
 from contextlib import asynccontextmanager
+
+logger = logging.getLogger(__name__)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -64,14 +67,19 @@ app.include_router(scanner.router)
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     is_dev = settings.app_env != "production"
-    detail = str(exc)
-    tb = traceback.format_exc() if is_dev else None
+    if is_dev:
+        detail = str(exc)
+        tb = traceback.format_exc()
+    else:
+        detail = "An internal error occurred. Please try again."
+        tb = None
+        logger.error(f"Unhandled exception: {type(exc).__name__}: {exc}")
     return JSONResponse(
         status_code=500,
         content={
             "detail": detail,
             "type": type(exc).__name__,
-            "traceback": tb,
+            **({"traceback": tb} if tb else {}),
         },
     )
 

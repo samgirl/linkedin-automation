@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { api } from '../lib/api'
 import { Settings as SettingsIcon, Key, Trash2, Shield, Clock, Bell } from 'lucide-react'
@@ -11,6 +11,14 @@ export default function Settings() {
   const [alertEnabled, setAlertEnabled] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('prosFocusSettings') || '{}')
+      if (saved.dailyLimitMinutes) setDailyLimit(saved.dailyLimitMinutes)
+      if (saved.alertEnabled !== undefined) setAlertEnabled(saved.alertEnabled)
+    } catch {}
+  }, [])
 
   const saveKeys = async () => {
     setSaving(true)

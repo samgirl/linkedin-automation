@@ -99,7 +99,10 @@ async def generate_draft(
 
     from app.services.content_generator import ContentGenerator
     gen = ContentGenerator(db)
-    draft = await gen.generate_for_opportunity(user.id, opp)
+    try:
+        draft = await gen.generate_for_opportunity(user.id, opp)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     return {
         "id": draft.id,
@@ -118,7 +121,10 @@ async def generate_standalone_draft(
 ):
     from app.services.content_generator import ContentGenerator
     gen = ContentGenerator(db)
-    draft = await gen.generate_standalone(user.id, req.type, req.topic, req.extra_context)
+    try:
+        draft = await gen.generate_standalone(user.id, req.type, req.topic, req.extra_context)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     return {
         "id": draft.id,

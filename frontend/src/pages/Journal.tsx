@@ -7,6 +7,7 @@ const entryTypes = [
   { type: 'voice', icon: Mic, label: 'Voice' },
   { type: 'meeting_note', icon: Users, label: 'Meeting' },
   { type: 'idea', icon: Lightbulb, label: 'Idea' },
+  { type: 'link', icon: LinkIcon, label: 'Link' },
 ]
 
 export default function Journal() {

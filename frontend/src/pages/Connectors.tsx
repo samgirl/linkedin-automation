@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../lib/api'
-import { Plug, MessageSquare, Brain, RefreshCw, Trash2, Key, Upload, ExternalLink } from 'lucide-react'
+import { Plug, MessageSquare, Brain, RefreshCw, Trash2, Key, Upload, ExternalLink, AlertCircle } from 'lucide-react'
 
 const providerConfig: Record<string, { icon: any; color: string; label: string; description: string }> = {
   linkedin: { icon: () => <span className="text-lg font-bold">in</span>, color: 'text-blue-400 bg-blue-400/10', label: 'LinkedIn', description: 'Sync your profile, posts, and activity' },
@@ -16,23 +16,30 @@ export default function Connectors() {
   const [connectingProvider, setConnectingProvider] = useState<string | null>(null)
   const [importFile, setImportFile] = useState<{ provider: string; file: File | null }>({ provider: '', file: null })
   const [syncing, setSyncing] = useState<string | null>(null)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     api.get('/connectors/').then(setConnections).catch(() => {}).finally(() => setLoading(false))
   }, [])
 
   const connectLinkedIn = async () => {
+    setError('')
     try {
       const resp = await api.get('/auth/linkedin')
       window.location.href = resp.url
-    } catch (e) { console.error(e) }
+    } catch (e: any) {
+      setError(e.message || 'LinkedIn is not configured yet. Add LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET to the server.')
+    }
   }
 
   const connectGoogle = async () => {
+    setError('')
     try {
       const resp = await api.get('/auth/google')
       window.location.href = resp.url
-    } catch (e) { console.error(e) }
+    } catch (e: any) {
+      setError(e.message || 'Google is not configured yet. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to the server.')
+    }
   }
 
   const connectWithApiKey = async (provider: string) => {
@@ -87,6 +94,13 @@ export default function Connectors() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {error && (
+          <div className="col-span-full flex items-center gap-2 rounded-lg bg-red-500/10 border border-red-500/20 p-3 text-sm text-red-400">
+            <AlertCircle size={16} />
+            {error}
+            <button onClick={() => setError('')} className="ml-auto text-red-400 hover:text-red-300">&times;</button>
+          </div>
+        )}
         {Object.entries(providerConfig).map(([key, conf]) => {
           const conn = connections.find(c => c.provider === key)
           const Icon = conf.icon

@@ -1,4 +1,5 @@
 import secrets
+import time
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse, HTMLResponse
@@ -17,6 +18,20 @@ from app.utils.crypto import encrypt_token, decrypt_token, hash_password, verify
 logger = logging.getLogger(__name__)
 settings = get_settings()
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+# In-memory OAuth state store (expires after 5 min)
+_oauth_states: dict[str, float] = {}
+
+
+def _store_state(state: str) -> None:
+    _oauth_states[state] = time.time()
+
+
+def _validate_state(state: str) -> bool:
+    if not state or state not in _oauth_states:
+        return False
+    created = _oauth_states.pop(state, 0)
+    return time.time() - created < 300  # 5 min expiry
 
 
 def _error_page(title: str, detail: str) -> HTMLResponse:
@@ -119,6 +134,7 @@ async def linkedin_login():
     if not settings.linkedin_client_id:
         raise HTTPException(status_code=503, detail="LinkedIn login is not configured. The server is missing LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET.")
     state = secrets.token_urlsafe(32)
+    _store_state(state)
     url = (
         f"https://www.linkedin.com/oauth/v2/authorization?"
         f"response_type=code&client_id={settings.linkedin_client_id}"
@@ -135,6 +151,7 @@ async def google_login():
     if not settings.google_client_id:
         raise HTTPException(status_code=503, detail="Google login is not configured. The server is missing GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.")
     state = secrets.token_urlsafe(32)
+    _store_state(state)
     url = (
         f"https://accounts.google.com/o/oauth2/v2/auth?"
         f"response_type=code&client_id={settings.google_client_id}"
@@ -153,6 +170,9 @@ async def google_callback(code: str = "", state: str = "", error: str = "", db: 
 
     if not code:
         return _error_page("Google Login Failed", "No authorization code received from Google. Please try again.")
+
+    if not _validate_state(state):
+        return _error_page("Google Login Failed", "Invalid or expired state. This may be a CSRF attempt. Please try again.")
 
     if not settings.google_client_id or not settings.google_client_secret:
         return _error_page("Server Config Error", "Google OAuth is not configured on the server. GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET is missing.")
@@ -213,7 +233,8 @@ async def google_callback(code: str = "", state: str = "", error: str = "", db: 
     access = create_access_token(user.id)
     refresh = create_refresh_token(user.id)
 
-    return RedirectResponse(f"{settings.frontend_url}/auth/callback?access={access}&refresh={refresh}")
+    # Use hash fragment so tokens are NOT sent to the server
+    return RedirectResponse(f"{settings.frontend_url}/auth/callback#access={access}&refresh={refresh}")
 
 
 @router.get("/callback/linkedin")
@@ -224,6 +245,9 @@ async def linkedin_callback(code: str = "", state: str = "", error: str = "", db
 
     if not code:
         return _error_page("LinkedIn Login Failed", "No authorization code received from LinkedIn. Please try again.")
+
+    if not _validate_state(state):
+        return _error_page("LinkedIn Login Failed", "Invalid or expired state. This may be a CSRF attempt. Please try again.")
 
     if not settings.linkedin_client_id or not settings.linkedin_client_secret:
         return _error_page("Server Config Error", "LinkedIn OAuth is not configured on the server. LINKEDIN_CLIENT_ID or LINKEDIN_CLIENT_SECRET is missing.")
@@ -284,4 +308,5 @@ async def linkedin_callback(code: str = "", state: str = "", error: str = "", db
     access = create_access_token(user.id)
     refresh = create_refresh_token(user.id)
 
-    return RedirectResponse(f"{settings.frontend_url}/auth/callback?access={access}&refresh={refresh}")
+    # Use hash fragment so tokens are NOT sent to the server
+    return RedirectResponse(f"{settings.frontend_url}/auth/callback#access={access}&refresh={refresh}")

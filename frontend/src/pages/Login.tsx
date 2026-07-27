@@ -45,12 +45,15 @@ export default function Login() {
       const resp = await api.get(`/auth/${provider}`)
       if (resp.url) {
         window.location.href = resp.url
-      } else if (resp.detail) {
-        setError(resp.detail)
-        setOauthLoading('')
       }
     } catch (e: any) {
-      setError(e.message || `Could not connect to ${provider}`)
+      // Extract meaningful error from the response
+      const msg = e.message || ''
+      if (msg.includes('not configured')) {
+        setError(`${provider === 'linkedin' ? 'LinkedIn' : 'Google'} login is not configured on the server yet.`)
+      } else {
+        setError(msg || `Could not connect to ${provider}`)
+      }
       setOauthLoading('')
     }
   }

@@ -1,7 +1,10 @@
 import os
+import logging
 from pydantic_settings import BaseSettings
 from pydantic import field_validator, model_validator
 from functools import lru_cache
+
+logger = logging.getLogger(__name__)
 
 
 def _detect_backend_url() -> str:
@@ -76,6 +79,12 @@ class Settings(BaseSettings):
 
         if self.frontend_url == "http://localhost:5173" and self.app_env == "production":
             self.frontend_url = "https://pros-frontend-eight.vercel.app"
+
+        if self.app_env == "production":
+            if self.jwt_secret_key in ("change-me", ""):
+                logger.error("JWT_SECRET_KEY is using the default value! Set a real secret on Render.")
+            if self.secret_key in ("change-me", ""):
+                logger.error("SECRET_KEY is using the default value! Set a real secret on Render.")
 
         return self
 
